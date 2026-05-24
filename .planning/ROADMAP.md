@@ -30,7 +30,12 @@ Decimal phases appear between their surrounding integers in numeric order.
   2. Partner can open the shared URL and see the same list — no account or login required
   3. The list URL is the only credential needed to access the list
   4. Supabase tables have RLS enabled — unauthenticated access is scoped to the list ID only
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 01-01-PLAN.md — Scaffold Vite project, install all dependencies, configure build + test infra, create Supabase project with schema and RLS
+- [ ] 01-02-PLAN.md — Zustand store, React Router shell, App entry, ListPage with Supabase query, and unit tests for SHARE-01/SHARE-02
+- [ ] 01-03-PLAN.md — CreateListForm, JoinListForm, LandingPage, ShareBanner with copy + Web Share API, and ListPage integration (full Walking Skeleton)
 
 ### Phase 2: List Management
 **Goal**: Users can add, edit, delete, and view grocery items with category grouping
@@ -90,7 +95,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 0/TBD | Not started | - |
+| 1. Foundation | 0/3 | Not started | - |
 | 2. List Management | 0/TBD | Not started | - |
 | 3. Shopping Flow | 0/TBD | Not started | - |
 | 4. Real-Time Sync | 0/TBD | Not started | - |
@@ -99,3 +104,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 ---
 *Roadmap created: 2026-05-24*
 *Coverage: 19/19 v1 requirements mapped*
+*Phase 1 planned: 2026-05-24 — 3 plans, 3 waves*
