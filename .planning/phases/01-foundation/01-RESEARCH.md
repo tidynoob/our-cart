@@ -624,7 +624,7 @@ function extractShareCode(input: string): string {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Supabase project pausing on free tier**
    - What we know: Supabase free tier pauses inactive projects after 7 days (OPS-01 is a v2 concern)
