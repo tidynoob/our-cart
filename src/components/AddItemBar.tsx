@@ -15,6 +15,11 @@ import {
 interface AddItemBarProps {
   listId: string
   addedBy: string
+  /**
+   * When true, the form is inert (e.g., before the user's name is set).
+   * Prevents creating anonymous items if the name prompt is bypassed (WR-04).
+   */
+  disabled?: boolean
 }
 
 /**
@@ -26,7 +31,7 @@ interface AddItemBarProps {
  * Per review: category dropdown shows SELECTABLE_CATEGORIES only (no Uncategorized).
  * Per review: all text inputs are 16px+ (text-base) to prevent iOS zoom.
  */
-export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
+export function AddItemBar({ listId, addedBy, disabled = false }: AddItemBarProps) {
   const addItem = useItemsStore((state) => state.addItem)
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState('')
@@ -34,10 +39,14 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
   const [expanded, setExpanded] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
+  // The form is inert while submitting or while externally disabled
+  // (e.g., before the user's name is set — WR-04).
+  const isInert = submitting || disabled
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
-    if (submitting) return
+    if (isInert) return
     const trimmedName = name.trim()
     if (!trimmedName) return
 
@@ -69,12 +78,12 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Add an item..."
-          disabled={submitting}
+          disabled={isInert}
           className="min-h-[48px] flex-1 text-base"
         />
         <Button
           type="submit"
-          disabled={submitting}
+          disabled={isInert}
           className="h-12 w-12"
           aria-label="Add item"
         >
@@ -97,14 +106,14 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
             value={quantity}
             onChange={(e) => setQuantity(e.target.value)}
             placeholder="Qty"
-            disabled={submitting}
+            disabled={isInert}
             className="w-20 text-base"
           />
           <Select
             value={category}
             onValueChange={(val) => setCategory(val ?? '')}
           >
-            <SelectTrigger className="h-8 flex-1" disabled={submitting}>
+            <SelectTrigger className="h-8 flex-1" disabled={isInert}>
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>

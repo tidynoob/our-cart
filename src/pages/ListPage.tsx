@@ -162,8 +162,14 @@ export default function ListPage() {
         <h1 className="text-2xl font-semibold">{list.name}</h1>
 
         <div className="mt-4 flex flex-col gap-6">
-          {/* Add item bar */}
-          <AddItemBar listId={list.id} addedBy={userName || ''} />
+          {/* Add item bar — disabled until the user's name is set so items
+              can never be created anonymously if the name prompt is
+              bypassed (WR-04). */}
+          <AddItemBar
+            listId={list.id}
+            addedBy={userName || ''}
+            disabled={userName === null}
+          />
 
           {/* Items loading state */}
           {itemsLoading && (
