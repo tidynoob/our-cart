@@ -13,7 +13,7 @@ Our Cart ships in five phases that mirror the dependency graph of the app itself
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Foundation** - Supabase schema, RLS, and shareable list link
+- [x] **Phase 1: Foundation** - Supabase schema, RLS, and shareable list link (completed 2026-05-25)
 - [ ] **Phase 2: List Management** - Add, edit, delete, and display items
 - [ ] **Phase 3: Shopping Flow** - Check off, uncheck, and clear completed items
 - [ ] **Phase 4: Real-Time Sync** - Live updates across both devices
@@ -46,7 +46,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 01-03-PLAN.md — CreateListForm, JoinListForm, LandingPage, ShareBanner with copy + Web Share API, and ListPage integration (full Walking Skeleton)
+- [x] 01-03-PLAN.md — CreateListForm, JoinListForm, LandingPage, ShareBanner with copy + Web Share API, and ListPage integration (full Walking Skeleton)
 
 ### Phase 2: List Management
 
@@ -118,7 +118,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 2/3 | In Progress|  |
+| 1. Foundation | 3/3 | Complete   | 2026-05-25 |
 | 2. List Management | 0/TBD | Not started | - |
 | 3. Shopping Flow | 0/TBD | Not started | - |
 | 4. Real-Time Sync | 0/TBD | Not started | - |
