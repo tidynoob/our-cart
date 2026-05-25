@@ -100,7 +100,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 03-01-PLAN.md — Base UI Checkbox wrapper, toggleChecked store action, ItemRow display mode with checkbox + checked styling, CategorySection/ListPage wiring (check/uncheck vertical slice — SHOP-01, SHOP-02)
+- [x] 03-01-PLAN.md — Base UI Checkbox wrapper, toggleChecked store action, ItemRow display mode with checkbox + checked styling, CategorySection/ListPage wiring (check/uncheck vertical slice — SHOP-01, SHOP-02)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -147,7 +147,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete   | 2026-05-25 |
 | 2. List Management | 5/5 | Complete   | 2026-05-25 |
-| 3. Shopping Flow | 0/2 | Not started | - |
+| 3. Shopping Flow | 1/2 | In Progress|  |
 | 4. Real-Time Sync | 0/TBD | Not started | - |
 | 5. Mobile UX | 0/TBD | Not started | - |
 
