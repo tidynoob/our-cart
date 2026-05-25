@@ -43,19 +43,22 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
 
     setSubmitting(true)
 
-    await addItem(
-      listId,
-      trimmedName,
-      quantity.trim() || undefined,
-      category || undefined,
-      addedBy
-    )
+    try {
+      await addItem(
+        listId,
+        trimmedName,
+        quantity.trim() || undefined,
+        category || undefined,
+        addedBy
+      )
 
-    setName('')
-    setQuantity('')
-    setCategory('')
-    setExpanded(false)
-    setSubmitting(false)
+      setName('')
+      setQuantity('')
+      setCategory('')
+      setExpanded(false)
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
