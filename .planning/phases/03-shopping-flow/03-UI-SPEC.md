@@ -84,7 +84,7 @@ semantic token set.
 | Dominant (60%) | --background | oklch(1 0 0) — white | Page surface, row background |
 | Secondary (30%) | --secondary / --muted | oklch(0.97 0 0) — near-white gray | Edit row bg (`bg-secondary/50`), dialog footer (`bg-muted/50`), hover/active row states |
 | Accent (10%) | --primary | oklch(0.205 0 0) — near-black | Filled checkbox background (`data-[checked]:bg-primary`), checkbox border filled state |
-| Destructive | --destructive | oklch(0.577 0.245 27.325) — red | "Clear" confirm button in modal (`variant="destructive"`) only |
+| Destructive | --destructive | oklch(0.577 0.245 27.325) — red | "Clear Items" confirm button in modal (`variant="destructive"`) only |
 
 Accent (`--primary`) reserved for: filled checkbox indicator background only. No other elements in
 this phase use primary as a fill.
@@ -93,7 +93,7 @@ Semantic tokens used this phase and their roles:
 - `--border` (oklch 0.922): row dividers, checkbox border unchecked state (`border-input` = same token)
 - `--muted-foreground` (oklch 0.556): quantity label, unknown-attribution badge text
 - `--primary-foreground` (oklch 0.985 — white): Check lucide icon inside filled checkbox
-- `--destructive`: Clear button background in confirmation dialog
+- `--destructive`: Clear Items button background in confirmation dialog
 
 Checked-item dimming:
 - `opacity-50` applied to the entire row div when `item.checked === true`.
@@ -203,14 +203,14 @@ as `NamePromptDialog`.
 | Property | Value |
 |----------|-------|
 | Trigger | `clearDialogOpen` state in ListPage, set to `true` on "Clear completed" button click |
-| `showCloseButton` | `false` — no X button in top-right; actions are Cancel and Clear only |
+| `showCloseButton` | `false` — no X button in top-right; actions are Keep Items and Clear Items only |
 | `disablePointerDismissal` | `true` — prevent accidental backdrop dismiss on mobile (one-handed shopping). Source: RESEARCH.md Pitfall 5, A2. |
 | Title | `Remove {N} checked item{N !== 1 ? 's' : ''}?` — singular/plural correct. |
 | Description | None — the title is self-explanatory for a grocery list context. |
-| Footer layout | `DialogFooter` default: `flex-col-reverse` on mobile, `flex-row justify-end` on sm+. Cancel on left/bottom, Clear on right/top on mobile. |
-| Cancel button | `variant="outline"`, label "Cancel". `onClick={() => setClearDialogOpen(false)}`. Plain Button, not DialogClose primitive. |
-| Clear button | `variant="destructive"`, label "Clear". `onClick` closes dialog then calls `clearChecked`. |
-| Button order in JSX | Cancel first, Clear second. `flex-col-reverse` makes Clear appear on top on mobile — matches mobile destructive-action convention. |
+| Footer layout | `DialogFooter` default: `flex-col-reverse` on mobile, `flex-row justify-end` on sm+. Keep Items on left/bottom, Clear Items on right/top on mobile. |
+| Keep Items button | `variant="outline"`, label `Keep Items`. `onClick={() => setClearDialogOpen(false)}`. Plain Button, not DialogClose primitive. |
+| Clear Items button | `variant="destructive"`, label `Clear Items`. `onClick` closes dialog then calls `clearChecked`. |
+| Button order in JSX | Keep Items first, Clear Items second. `flex-col-reverse` makes Clear Items appear on top on mobile — matches mobile destructive-action convention. |
 
 ---
 
@@ -220,14 +220,14 @@ as `NamePromptDialog`.
 |---------|------|
 | Primary CTA (clear button) | `Clear completed (N)` — N is the integer count, substituted in render |
 | Dialog title | `Remove {N} checked item{N !== 1 ? 's' : ''}?` |
-| Dialog cancel | `Cancel` |
-| Dialog confirm (destructive) | `Clear` |
+| Dialog cancel | `Keep Items` |
+| Dialog confirm (destructive) | `Clear Items` |
 | Checkbox aria-label (unchecked) | `Mark {item.name} as bought` |
 | Checkbox aria-label (checked) | `Mark {item.name} as not bought` |
 | Empty state (no checked items) | Not applicable — the Clear button is absent, no empty state copy needed |
 | Error state (toggle failure) | Existing error banner pattern: `Failed to update item` with Retry. No new copy. |
 | Error state (clear failure) | Existing error banner pattern: `Failed to clear items` with Retry. No new copy. |
-| Destructive confirmation | Clear: `Remove {N} checked item{s}?` → `Clear` / `Cancel` |
+| Destructive confirmation | Clear: `Remove {N} checked item{s}?` → `Clear Items` / `Keep Items` |
 
 Copy tone: Terse, action-oriented. No "Are you sure?". No ellipsis. Matches Phase 2 Delete
 confirmation pattern ("Remove item?" used for single delete).
@@ -255,8 +255,8 @@ Optimistic update flips `item.checked` to `false`. Visual state resets instantly
 1. `checkedCount >= 1` → "Clear completed (N)" button is rendered.
 2. User taps button → `setClearDialogOpen(true)`.
 3. Dialog opens with `disablePointerDismissal={true}`. Backdrop tap does nothing.
-4. User taps "Cancel" → `setClearDialogOpen(false)`. No data change.
-5. User taps "Clear" → `setClearDialogOpen(false)` first, then `clearChecked(list.id)`.
+4. User taps "Keep Items" → `setClearDialogOpen(false)`. No data change.
+5. User taps "Clear Items" → `setClearDialogOpen(false)` first, then `clearChecked(list.id)`.
 6. Optimistic update: all checked items removed from store immediately. Button disappears (count=0).
 7. Supabase DELETE runs async. On success: no-op. On error: rollback restores items + error banner.
 
@@ -267,8 +267,8 @@ Optimistic update flips `item.checked` to `false`. Visual state resets instantly
 - Row body: Tab-focusable (`tabIndex={0}`). Enter or Space opens edit mode (pre-existing behavior,
   unchanged).
 - Dialog: Base UI Dialog traps focus inside the modal. Escape closes it (calls `onOpenChange(false)`),
-  which sets `setClearDialogOpen(false)`. This is equivalent to Cancel — no data change.
-- Clear button: standard Button, Tab-focusable, Enter activates.
+  which sets `setClearDialogOpen(false)`. This is equivalent to Keep Items — no data change.
+- Clear Items button: standard Button, Tab-focusable, Enter activates.
 
 ---
 
@@ -297,7 +297,7 @@ No third-party shadcn registries are used this phase. No `npx shadcn view` gate 
 | Modal dialog for clear confirmation | D-07 | CONTEXT.md |
 | Base UI checkbox (data-[checked] attribute) | Pattern 2, Pitfall 2 | RESEARCH.md |
 | disablePointerDismissal=true on dialog | Pitfall 5, A2 | RESEARCH.md |
-| Cancel = plain Button, not DialogClose | Open Question 1 | RESEARCH.md |
+| Keep Items = plain Button, not DialogClose | Open Question 1 | RESEARCH.md |
 | 44px wrapper div approach | Open Question 2 | RESEARCH.md |
 | Design tokens (all colors, font, spacing) | src/index.css | Codebase scan |
 | Row min-h-[48px], gap-3, px-3 | src/components/ItemRow.tsx | Codebase scan |
