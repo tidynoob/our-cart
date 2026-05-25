@@ -50,6 +50,7 @@ export default function ListPage() {
   const updateItem = useItemsStore((state) => state.updateItem)
   const deleteItem = useItemsStore((state) => state.deleteItem)
   const toggleChecked = useItemsStore((state) => state.toggleChecked)
+  const clearChecked = useItemsStore((state) => state.clearChecked)
 
   // Derived from store — no new state field (per research: items.filter(i => i.checked).length)
   const checkedCount = items.filter((i) => i.checked).length
@@ -141,6 +142,15 @@ export default function ListPage() {
     // Store handles rollback + error state internally; .catch() guards
     // against unhandled rejections from network-level throws (WR-03).
     toggleChecked(id).catch(() => {})
+  }
+
+  // --- Clear Checked Handler (Phase 3 — SHOP-03/04) ---
+
+  /** Close dialog and bulk-delete all checked items optimistically via store. */
+  function handleClearConfirm() {
+    setClearDialogOpen(false)
+    // Store handles optimistic remove, rollback, and error state internally (SHOP-03).
+    clearChecked(list!.id).catch(() => {})
   }
 
   if (loading) {
@@ -279,10 +289,7 @@ export default function ListPage() {
             </Button>
             <Button
               variant="destructive"
-              onClick={() => {
-                setClearDialogOpen(false)
-                // clearChecked is Plan 02 — placeholder kept for Plan 02 wiring
-              }}
+              onClick={handleClearConfirm}
             >
               Clear Items
             </Button>

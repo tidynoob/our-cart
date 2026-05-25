@@ -1,13 +1,44 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { render, screen, waitFor, act } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import ListPage from './ListPage'
+import { useItemsStore } from '@/stores/itemsStore'
 
 const mockEq = vi.fn()
 const mockSingle = vi.fn()
 const mockSelect = vi.fn()
 const mockFrom = vi.fn()
 const mockOrder = vi.fn()
+const mockDeleteEq2 = vi.fn()
+const mockDeleteEq1 = vi.fn()
+const mockDelete = vi.fn()
+
+// Seeded items for clear-flow tests — 1 unchecked, 1 checked
+const checkedItem = {
+  id: 'item-checked-1',
+  list_id: 'list-id-1',
+  name: 'Milk',
+  quantity: null,
+  category: null,
+  checked: true,
+  added_by: null,
+  created_at: new Date().toISOString(),
+}
+
+const uncheckedItem = {
+  id: 'item-unchecked-1',
+  list_id: 'list-id-1',
+  name: 'Eggs',
+  quantity: null,
+  category: null,
+  checked: false,
+  added_by: null,
+  created_at: new Date().toISOString(),
+}
+
+// Default items response — empty list (original tests)
+let mockItemsResponse: unknown[] = []
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -23,7 +54,21 @@ vi.mock('@/lib/supabase', () => ({
                 single: mockSingle,
                 order: (...args: unknown[]) => {
                   mockOrder(...args)
-                  return Promise.resolve({ data: [], error: null })
+                  return Promise.resolve({ data: mockItemsResponse, error: null })
+                },
+              }
+            },
+          }
+        },
+        delete: () => {
+          mockDelete()
+          return {
+            eq: (col: string, val: unknown) => {
+              mockDeleteEq1(col, val)
+              return {
+                eq: (col2: string, val2: unknown) => {
+                  mockDeleteEq2(col2, val2)
+                  return Promise.resolve({ data: null, error: null })
                 },
               }
             },
@@ -48,6 +93,7 @@ function renderAtRoute(code: string) {
 describe('ListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockItemsResponse = []
   })
 
   it('renders the list name when Supabase returns data (SHARE-02)', async () => {
@@ -104,5 +150,126 @@ describe('ListPage', () => {
     // Confirm no case normalization — the exact mixed-case value from the URL is passed
     expect(mockEq).not.toHaveBeenCalledWith('share_code', 'abc12345')
     expect(mockEq).not.toHaveBeenCalledWith('share_code', 'ABC12345'.toLowerCase())
+  })
+})
+
+// Helper: set up a loaded list with a given set of items
+function setupListWithItems(items: typeof mockItemsResponse) {
+  mockItemsResponse = items
+  mockSingle.mockResolvedValueOnce({
+    data: {
+      id: 'list-id-1',
+      name: 'Groceries',
+      share_code: 'ABC12345',
+      created_at: new Date().toISOString(),
+    },
+    error: null,
+  })
+}
+
+describe('ListPage — clear completed flow (D-06, D-07, SHOP-03, SHOP-04)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockItemsResponse = []
+    // Reset Zustand store between tests to avoid state leakage
+    useItemsStore.setState({ items: [], loading: false, error: null })
+    // Provide a stored user name so NamePromptDialog doesn't block rendering
+    localStorage.setItem('our-cart-name-list-id-1', 'TestUser')
+  })
+
+  afterEach(() => {
+    localStorage.removeItem('our-cart-name-list-id-1')
+  })
+
+  it('no button when no checked items: Clear completed button is absent from DOM (D-06)', async () => {
+    setupListWithItems([uncheckedItem])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    // Wait for items to load
+    await waitFor(() => {
+      expect(screen.queryByText('Loading items...')).toBeNull()
+    })
+
+    // Button must be absent entirely — not disabled, not hidden
+    expect(screen.queryByText(/Clear completed/)).toBeNull()
+  })
+
+  it('button visible when checked items exist: shows "Clear completed (1)" (D-06)', async () => {
+    setupListWithItems([checkedItem])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByText(/Clear completed \(1\)/)).toBeTruthy()
+    })
+  })
+
+  it('dialog opens on button click: shows dialog with Keep Items and Clear Items buttons (SHOP-04)', async () => {
+    setupListWithItems([checkedItem])
+    renderAtRoute('ABC12345')
+
+    const button = await screen.findByText(/Clear completed \(1\)/)
+    await act(async () => {
+      await userEvent.click(button)
+    })
+
+    // Dialog title is split by JSX interpolation — verify via dialog action buttons
+    // Use findByText (defaults to 1000ms) — act() above ensures portal mounts
+    expect(await screen.findByText('Keep Items')).toBeTruthy()
+    expect(screen.getByText('Clear Items')).toBeTruthy()
+  })
+
+  it('Keep Items closes dialog without clearing: dialog buttons gone and clearChecked was NOT triggered (SHOP-04)', async () => {
+    setupListWithItems([checkedItem])
+    renderAtRoute('ABC12345')
+
+    const clearButton = await screen.findByText(/Clear completed \(1\)/)
+    await act(async () => {
+      await userEvent.click(clearButton)
+    })
+
+    // Dialog should be open — wait for portal to mount
+    const keepButton = await screen.findByText('Keep Items')
+
+    // Click Keep Items
+    await act(async () => {
+      await userEvent.click(keepButton)
+    })
+
+    // Dialog should close — Keep Items button gone
+    await waitFor(() => {
+      expect(screen.queryByText('Keep Items')).toBeNull()
+    })
+
+    // Supabase delete must NOT have been called
+    expect(mockDelete).not.toHaveBeenCalled()
+  })
+
+  it('Clear Items triggers clearChecked: calls Supabase delete with list_id and checked=true (SHOP-03)', async () => {
+    setupListWithItems([checkedItem])
+    renderAtRoute('ABC12345')
+
+    const clearButton = await screen.findByText(/Clear completed \(1\)/)
+    await act(async () => {
+      await userEvent.click(clearButton)
+    })
+
+    // Dialog should be open — wait for portal to mount
+    const confirmButton = await screen.findByText('Clear Items')
+
+    // Click Clear Items
+    await act(async () => {
+      await userEvent.click(confirmButton)
+    })
+
+    // Supabase delete chain must have been called with correct args
+    await waitFor(() => {
+      expect(mockDelete).toHaveBeenCalled()
+      expect(mockDeleteEq1).toHaveBeenCalledWith('list_id', 'list-id-1')
+      expect(mockDeleteEq2).toHaveBeenCalledWith('checked', true)
+    })
   })
 })
