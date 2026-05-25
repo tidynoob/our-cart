@@ -14,7 +14,7 @@ Our Cart ships in five phases that mirror the dependency graph of the app itself
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Supabase schema, RLS, and shareable list link (completed 2026-05-25)
-- [ ] **Phase 2: List Management** - Add, edit, delete, and display items
+- [x] **Phase 2: List Management** - Add, edit, delete, and display items (completed 2026-05-25)
 - [ ] **Phase 3: Shopping Flow** - Check off, uncheck, and clear completed items
 - [ ] **Phase 4: Real-Time Sync** - Live updates across both devices
 - [ ] **Phase 5: Mobile UX** - Phone-first polish, fast entry, and deployment hardening
@@ -70,11 +70,11 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 02-02-PLAN.md — NamePromptDialog, AddItemBar, AttributionBadge, CategorySection, ItemRow, and ListPage integration (add + view vertical slice)
+- [x] 02-02-PLAN.md — NamePromptDialog, AddItemBar, AttributionBadge, CategorySection, ItemRow, and ListPage integration (add + view vertical slice)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 02-03-PLAN.md — Inline edit mode, delete confirmation, and edit/delete state wiring (edit + delete vertical slice)
+- [x] 02-03-PLAN.md — Inline edit mode, delete confirmation, and edit/delete state wiring (edit + delete vertical slice)
 
 **UI hint**: yes
 
@@ -132,7 +132,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete   | 2026-05-25 |
-| 2. List Management | 1/3 | In Progress|  |
+| 2. List Management | 3/3 | Complete   | 2026-05-25 |
 | 3. Shopping Flow | 0/TBD | Not started | - |
 | 4. Real-Time Sync | 0/TBD | Not started | - |
 | 5. Mobile UX | 0/TBD | Not started | - |
