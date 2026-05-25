@@ -7,7 +7,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 
 interface NamePromptDialogProps {
   open: boolean
@@ -51,9 +51,9 @@ export function NamePromptDialog({ open, listId, onNameSaved }: NamePromptDialog
             autoFocus
             className="text-base"
           />
-          <Button type="submit" onClick={handleSave} disabled={!name.trim()}>
+          <button type="submit" className={buttonVariants()} disabled={!name.trim()}>
             Save
-          </Button>
+          </button>
         </form>
       </DialogContent>
     </Dialog>

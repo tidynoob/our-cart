@@ -152,11 +152,13 @@ export default function ListPage() {
       )}
 
       {/* Name prompt dialog — shown when no stored name for this list */}
-      <NamePromptDialog
-        open={userName === null}
-        listId={list.id}
-        onNameSaved={(name) => setUserName(name)}
-      />
+      {userName === null && (
+        <NamePromptDialog
+          open={true}
+          listId={list.id}
+          onNameSaved={(name) => setUserName(name)}
+        />
+      )}
 
       <div className="w-full max-w-md p-4">
         <h1 className="text-2xl font-semibold">{list.name}</h1>
