@@ -30,8 +30,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Shopping Flow
 
-- [ ] **SHOP-01**: User can check off an item (item stays visible, shown crossed out/dimmed)
-- [ ] **SHOP-02**: User can uncheck a previously checked item
+- [x] **SHOP-01**: User can check off an item (item stays visible, shown crossed out/dimmed)
+- [x] **SHOP-02**: User can uncheck a previously checked item
 - [x] **SHOP-03**: User can clear all checked items (removes from both views)
 - [x] **SHOP-04**: Clear action requires confirmation before executing
 
@@ -90,8 +90,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHARE-01 | Phase 1 | Pending |
 | SHARE-02 | Phase 1 | Pending |
 | SHARE-03 | Phase 1 | Pending |
-| SHOP-01 | Phase 3 | Pending |
-| SHOP-02 | Phase 3 | Pending |
+| SHOP-01 | Phase 3 | Complete |
+| SHOP-02 | Phase 3 | Complete |
 | SHOP-03 | Phase 3 | Complete |
 | SHOP-04 | Phase 3 | Complete |
 | UX-01 | Phase 5 | Pending |
