@@ -96,7 +96,16 @@ Plans:
   3. User can clear all checked items from the list in a single action
   4. Clear action requires an explicit confirmation step before any items are removed
 
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+**Wave 1**
+
+- [ ] 03-01-PLAN.md — Base UI Checkbox wrapper, toggleChecked store action, ItemRow display mode with checkbox + checked styling, CategorySection/ListPage wiring (check/uncheck vertical slice — SHOP-01, SHOP-02)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 03-02-PLAN.md — clearChecked store action, conditional "Clear completed (N)" button, confirmation Dialog with "Keep Items" / "Clear Items" (clear vertical slice — SHOP-03, SHOP-04)
+
 **UI hint**: yes
 
 ### Phase 4: Real-Time Sync
@@ -138,7 +147,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete   | 2026-05-25 |
 | 2. List Management | 5/5 | Complete   | 2026-05-25 |
-| 3. Shopping Flow | 0/TBD | Not started | - |
+| 3. Shopping Flow | 0/2 | Not started | - |
 | 4. Real-Time Sync | 0/TBD | Not started | - |
 | 5. Mobile UX | 0/TBD | Not started | - |
 
@@ -148,3 +157,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 *Phase 1 planned: 2026-05-24 — 3 plans, 3 waves*
 *Phase 2 planned: 2026-05-25 — 3 plans, 3 waves*
 *Phase 2 gap closure: 2026-05-25 — 2 plans (UAT blocker fixes)*
+*Phase 3 planned: 2026-05-25 — 2 plans, 2 waves*
