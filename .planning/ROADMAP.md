@@ -62,7 +62,7 @@ Plans:
   4. Items display who added them via an initials or color indicator per device
   5. Items are grouped and sorted by category in the list view
 
-**Plans**: 3 plans
+**Plans**: 4 plans
 Plans:
 **Wave 1**
 
@@ -75,6 +75,10 @@ Plans:
 **Wave 3** *(blocked on Wave 2 completion)*
 
 - [x] 02-03-PLAN.md — Inline edit mode, delete confirmation, and edit/delete state wiring (edit + delete vertical slice)
+
+**Gap Closure**
+
+- [ ] 02-04-PLAN.md — Fix NamePromptDialog Save button (@base-ui/react type override bug) and add regression test
 
 **UI hint**: yes
 
@@ -132,7 +136,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete   | 2026-05-25 |
-| 2. List Management | 3/3 | Complete   | 2026-05-25 |
+| 2. List Management | 3/4 | Gap closure | - |
 | 3. Shopping Flow | 0/TBD | Not started | - |
 | 4. Real-Time Sync | 0/TBD | Not started | - |
 | 5. Mobile UX | 0/TBD | Not started | - |
@@ -142,3 +146,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 *Coverage: 19/19 v1 requirements mapped*
 *Phase 1 planned: 2026-05-24 — 3 plans, 3 waves*
 *Phase 2 planned: 2026-05-25 — 3 plans, 3 waves*
+*Phase 2 gap closure: 2026-05-25 — 1 plan (UAT blocker fix)*
