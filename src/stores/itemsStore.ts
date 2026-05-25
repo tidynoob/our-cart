@@ -143,6 +143,7 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       items: state.items.map((i) =>
         i.id === id ? { ...i, checked: nextChecked } : i
       ),
+      error: null,
     }))
 
     const { error } = await supabase
@@ -167,6 +168,7 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
     // Optimistic bulk remove — remove all checked items immediately
     set((state) => ({
       items: state.items.filter((i) => !i.checked),
+      error: null,
     }))
 
     const { error } = await supabase
@@ -176,11 +178,16 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       .eq('checked', true)
 
     if (error) {
-      // Bulk rollback: restore all removed items + error in single set() call (CR-02)
-      set((state) => ({
-        items: [...state.items, ...checkedItems],
-        error: 'Failed to clear items',
-      }))
+      // Bulk rollback: restore removed items + error in single set() call (CR-02).
+      // Dedup against current ids so a concurrent re-insert can't double an item (CR-01).
+      set((state) => {
+        const present = new Set(state.items.map((i) => i.id))
+        const restored = checkedItems.filter((i) => !present.has(i.id))
+        return {
+          items: [...state.items, ...restored],
+          error: 'Failed to clear items',
+        }
+      })
     }
   },
 }))
