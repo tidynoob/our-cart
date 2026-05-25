@@ -93,3 +93,10 @@ None - no external service configuration required.
 ---
 *Phase: 02-list-management*
 *Completed: 2026-05-25*
+
+## Self-Check: PASSED
+
+- src/components/ItemRow.tsx: FOUND
+- .planning/phases/02-list-management/02-05-SUMMARY.md: FOUND
+- Task commit c3c6f3a: FOUND
+- Docs commit 26d8b5a: FOUND
