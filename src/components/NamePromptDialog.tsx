@@ -23,12 +23,16 @@ interface NamePromptDialogProps {
 export function NamePromptDialog({ open, listId, onNameSaved }: NamePromptDialogProps) {
   const [name, setName] = useState('')
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  function handleSave() {
     const trimmed = name.trim()
     if (!trimmed) return
     localStorage.setItem(`our-cart-name-${listId}`, trimmed)
     onNameSaved(trimmed)
+  }
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    handleSave()
   }
 
   return (
@@ -47,7 +51,7 @@ export function NamePromptDialog({ open, listId, onNameSaved }: NamePromptDialog
             autoFocus
             className="text-base"
           />
-          <Button type="submit" disabled={!name.trim()}>
+          <Button type="submit" onClick={handleSave} disabled={!name.trim()}>
             Save
           </Button>
         </form>
