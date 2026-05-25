@@ -113,3 +113,95 @@ describe('itemsStore — toggleChecked', () => {
     expect(useItemsStore.getState().items.find((i) => i.id === 'item-1')?.checked).toBe(false)
   })
 })
+
+describe('itemsStore — clearChecked', () => {
+  // Seed items: one unchecked, two checked
+  const seedItems = [
+    {
+      id: 'item-A',
+      list_id: 'list-1',
+      name: 'Apples',
+      quantity: null,
+      category: null,
+      checked: false,
+      added_by: null,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'item-B',
+      list_id: 'list-1',
+      name: 'Bananas',
+      quantity: null,
+      category: null,
+      checked: true,
+      added_by: null,
+      created_at: new Date().toISOString(),
+    },
+    {
+      id: 'item-C',
+      list_id: 'list-1',
+      name: 'Carrots',
+      quantity: null,
+      category: null,
+      checked: true,
+      added_by: null,
+      created_at: new Date().toISOString(),
+    },
+  ]
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useItemsStore.setState({ items: [...seedItems], loading: false, error: null })
+    mockUpdateFn._resolvePromise = undefined
+    mockDeleteFn._resolvePromise = undefined
+  })
+
+  it('clearChecked optimistic: immediately removes only checked items before Supabase resolves (SHOP-03)', async () => {
+    // Use a promise we control so we can inspect optimistic state
+    let resolveDelete!: (value: unknown) => void
+    const pendingPromise = new Promise((res) => { resolveDelete = res })
+    mockDeleteFn._resolvePromise = pendingPromise
+
+    // Call without awaiting — inspect optimistic state synchronously
+    const clearPromise = useItemsStore.getState().clearChecked('list-1')
+
+    // After the call, only unchecked item-A should remain
+    const items = useItemsStore.getState().items
+    expect(items).toHaveLength(1)
+    expect(items[0].id).toBe('item-A')
+
+    // Resolve Supabase and await
+    resolveDelete({ data: null, error: null })
+    await clearPromise
+  })
+
+  it('clearChecked rollback: restores all checked items and sets error when Supabase returns an error (SHOP-03 rollback)', async () => {
+    mockDeleteFn._resolvePromise = Promise.resolve({ data: null, error: { message: 'DB error' } })
+
+    await useItemsStore.getState().clearChecked('list-1')
+
+    const state = useItemsStore.getState()
+    // All 3 items should be restored
+    expect(state.items).toHaveLength(3)
+    expect(state.items.find((i) => i.id === 'item-B')).toBeDefined()
+    expect(state.items.find((i) => i.id === 'item-C')).toBeDefined()
+    // Error message must match exactly
+    expect(state.error).toBe('Failed to clear items')
+  })
+
+  it('clearChecked no-op: does not call Supabase when no items are checked (early return guard)', async () => {
+    // Reset state to all-unchecked
+    useItemsStore.setState({
+      items: [{ ...seedItems[0], checked: false }],
+      loading: false,
+      error: null,
+    })
+
+    await useItemsStore.getState().clearChecked('list-1')
+
+    // Supabase delete should NOT have been called
+    expect(mockDeleteFn).not.toHaveBeenCalled()
+    // Items unchanged
+    expect(useItemsStore.getState().items).toHaveLength(1)
+  })
+})

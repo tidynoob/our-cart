@@ -21,6 +21,7 @@ interface ItemsState {
   ) => Promise<void>
   deleteItem: (id: string) => Promise<void>
   toggleChecked: (id: string) => Promise<void>
+  clearChecked: (listId: string) => Promise<void>
 }
 
 export const useItemsStore = create<ItemsState>()((set, get) => ({
@@ -154,6 +155,31 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       set((state) => ({
         items: state.items.map((i) => (i.id === id ? prev : i)),
         error: 'Failed to update item',
+      }))
+    }
+  },
+
+  clearChecked: async (listId) => {
+    // Snapshot BEFORE optimistic removal (Pitfall 4 — read before set())
+    const checkedItems = get().items.filter((i) => i.checked)
+    if (checkedItems.length === 0) return
+
+    // Optimistic bulk remove — remove all checked items immediately
+    set((state) => ({
+      items: state.items.filter((i) => !i.checked),
+    }))
+
+    const { error } = await supabase
+      .from('items')
+      .delete()
+      .eq('list_id', listId)
+      .eq('checked', true)
+
+    if (error) {
+      // Bulk rollback: restore all removed items + error in single set() call (CR-02)
+      set((state) => ({
+        items: [...state.items, ...checkedItems],
+        error: 'Failed to clear items',
       }))
     }
   },
