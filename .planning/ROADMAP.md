@@ -62,7 +62,20 @@ Plans:
   4. Items display who added them via an initials or color indicator per device
   5. Items are grouped and sorted by category in the list view
 
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 1**
+
+- [ ] 02-01-PLAN.md — Schema migration (added_by column + UPDATE/DELETE RLS), shadcn Dialog/Select install, Item type, categories/attribution utilities, itemsStore with optimistic CRUD
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 02-02-PLAN.md — NamePromptDialog, AddItemBar, AttributionBadge, CategorySection, ItemRow, and ListPage integration (add + view vertical slice)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 02-03-PLAN.md — Inline edit mode, delete confirmation, and edit/delete state wiring (edit + delete vertical slice)
+
 **UI hint**: yes
 
 ### Phase 3: Shopping Flow
@@ -119,7 +132,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete   | 2026-05-25 |
-| 2. List Management | 0/TBD | Not started | - |
+| 2. List Management | 0/3 | Planned | - |
 | 3. Shopping Flow | 0/TBD | Not started | - |
 | 4. Real-Time Sync | 0/TBD | Not started | - |
 | 5. Mobile UX | 0/TBD | Not started | - |
@@ -128,3 +141,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 *Roadmap created: 2026-05-24*
 *Coverage: 19/19 v1 requirements mapped*
 *Phase 1 planned: 2026-05-24 — 3 plans, 3 waves*
+*Phase 2 planned: 2026-05-25 — 3 plans, 3 waves*
