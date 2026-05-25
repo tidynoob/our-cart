@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useUIStore } from '@/stores/uiStore'
 import { useItemsStore } from '@/stores/itemsStore'
 import { groupItemsByCategory } from '@/lib/categories'
+import type { Item } from '@/types/item'
 import { ShareBanner } from '@/components/ShareBanner'
 import { NamePromptDialog } from '@/components/NamePromptDialog'
 import { AddItemBar } from '@/components/AddItemBar'
@@ -26,11 +27,17 @@ export default function ListPage() {
   const [error, setError] = useState<string | null>(null)
   const [userName, setUserName] = useState<string | null>(null)
 
+  // Edit/delete state managed locally in ListPage (not Zustand)
+  // Per review: these are ephemeral UI state for this page only
+  const [editingItemId, setEditingItemId] = useState<string | null>(null)
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
+
   const items = useItemsStore((state) => state.items)
   const itemsLoading = useItemsStore((state) => state.loading)
   const itemsError = useItemsStore((state) => state.error)
   const fetchItems = useItemsStore((state) => state.fetchItems)
-  const setEditingItemId = useItemsStore((state) => state.setEditingItemId)
+  const updateItem = useItemsStore((state) => state.updateItem)
+  const deleteItem = useItemsStore((state) => state.deleteItem)
 
   // Lifecycle step 1: Fetch list by share code
   useEffect(() => {
@@ -68,6 +75,45 @@ export default function ListPage() {
       setUserName(storedName)
     }
   }, [list, fetchItems])
+
+  // --- Edit/Delete Handlers ---
+
+  /** Tap an item to enter edit mode. Switches to new item if another is being edited. */
+  function handleItemTap(id: string) {
+    if (editingItemId === id) return
+    setEditingItemId(id)
+    setDeletingItemId(null)
+  }
+
+  /** Exit edit mode without saving (also clears delete state). */
+  function handleCancelEdit() {
+    setEditingItemId(null)
+    setDeletingItemId(null)
+  }
+
+  /** Save edited item changes via store action, then exit edit mode. */
+  function handleSave(id: string, changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>) {
+    updateItem(id, changes)
+    setEditingItemId(null)
+    setDeletingItemId(null)
+  }
+
+  /** Show delete confirmation for the currently editing item. */
+  function handleDelete(id: string) {
+    setDeletingItemId(id)
+  }
+
+  /** Actually delete the item via store action and exit edit/delete mode. */
+  function handleConfirmDelete(id: string) {
+    deleteItem(id)
+    setEditingItemId(null)
+    setDeletingItemId(null)
+  }
+
+  /** Cancel delete confirmation — go back to edit mode (clear deletingItemId only). */
+  function handleCancelDelete() {
+    setDeletingItemId(null)
+  }
 
   if (loading) {
     return (
@@ -148,7 +194,14 @@ export default function ListPage() {
               key={group.category}
               category={group.category}
               items={group.items}
-              onItemTap={(id) => setEditingItemId(id)}
+              editingItemId={editingItemId}
+              deletingItemId={deletingItemId}
+              onItemTap={handleItemTap}
+              onCancelEdit={handleCancelEdit}
+              onSave={handleSave}
+              onDelete={handleDelete}
+              onConfirmDelete={handleConfirmDelete}
+              onCancelDelete={handleCancelDelete}
             />
           ))}
         </div>

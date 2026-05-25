@@ -20,6 +20,8 @@ interface ItemRowProps {
   isDeleting: boolean
   onTap: () => void
   onDelete: () => void
+  onCancelDelete: () => void
+  onConfirmDelete: () => void
   onCancelEdit: () => void
   onSave: (id: string, changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>) => void
 }
@@ -45,6 +47,8 @@ export function ItemRow({
   isDeleting,
   onTap,
   onDelete,
+  onCancelDelete,
+  onConfirmDelete,
   onCancelEdit,
   onSave,
 }: ItemRowProps) {
@@ -124,8 +128,8 @@ export function ItemRow({
     return (
       <DeleteConfirmation
         itemId={item.id}
-        onCancel={onCancelEdit}
-        onConfirm={() => onDelete()}
+        onCancel={onCancelDelete}
+        onConfirm={onConfirmDelete}
       />
     )
   }
