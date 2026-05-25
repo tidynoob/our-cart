@@ -7,6 +7,7 @@ const mockEq = vi.fn()
 const mockSingle = vi.fn()
 const mockSelect = vi.fn()
 const mockFrom = vi.fn()
+const mockOrder = vi.fn()
 
 vi.mock('@/lib/supabase', () => ({
   supabase: {
@@ -20,6 +21,10 @@ vi.mock('@/lib/supabase', () => ({
               mockEq(col, val)
               return {
                 single: mockSingle,
+                order: (...args: unknown[]) => {
+                  mockOrder(...args)
+                  return Promise.resolve({ data: [], error: null })
+                },
               }
             },
           }

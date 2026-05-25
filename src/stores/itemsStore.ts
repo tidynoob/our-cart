@@ -6,8 +6,10 @@ interface ItemsState {
   items: Item[]
   loading: boolean
   error: string | null
+  editingItemId: string | null
 
   fetchItems: (listId: string) => Promise<void>
+  setEditingItemId: (id: string | null) => void
   addItem: (
     listId: string,
     name: string,
@@ -26,6 +28,9 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
   items: [],
   loading: false,
   error: null,
+  editingItemId: null,
+
+  setEditingItemId: (id) => set({ editingItemId: id }),
 
   fetchItems: async (listId) => {
     set({ loading: true, error: null })
