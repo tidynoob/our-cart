@@ -42,7 +42,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 01-02-PLAN.md — Zustand store, React Router shell, App entry, ListPage with Supabase query, and unit tests for SHARE-01/SHARE-02
+- [x] 01-02-PLAN.md — Zustand store, React Router shell, App entry, ListPage with Supabase query, and unit tests for SHARE-01/SHARE-02
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -118,7 +118,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Foundation | 1/3 | In Progress|  |
+| 1. Foundation | 2/3 | In Progress|  |
 | 2. List Management | 0/TBD | Not started | - |
 | 3. Shopping Flow | 0/TBD | Not started | - |
 | 4. Real-Time Sync | 0/TBD | Not started | - |
