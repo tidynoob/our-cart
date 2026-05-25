@@ -6,8 +6,9 @@
  * person sees a consistent color for their items.
  *
  * Per D-07 and UI spec: small colored initials badge next to each item.
- * Per review concern #4: uses a stable hash resistant to name variants
- * (e.g., "Mitch" and "Mitchell" map to the same color slot).
+ * Assignment is deterministic: the same exact name string always maps to
+ * the same color slot. It is NOT nickname-resistant — variants like
+ * "Mike"/"Michael" or "Jen"/"Jennifer" may map to different slots.
  */
 
 /** Two-slot color palette for the two-person use case. */
@@ -19,9 +20,10 @@ export const PERSON_COLORS = [
 /**
  * Computes a stable color slot (0 or 1) from a name string.
  *
- * Uses the average character code (floored) mod 2, which provides
- * stability across name variants like nicknames vs full names
- * (e.g., "Mitch" and "Mitchell" both hash to the same slot).
+ * Uses the average character code (floored) mod 2 for deterministic
+ * assignment. The same exact name string always maps to the same slot.
+ * This is NOT nickname-resistant: different name variants may map to
+ * different slots.
  */
 export function getColorSlot(name: string): number {
   if (name.length === 0) return 0
@@ -34,7 +36,7 @@ export function getColorSlot(name: string): number {
 
 /**
  * Returns a deterministic color object (bg + text) for a person's name.
- * Same name always returns the same color. Resistant to nickname variants.
+ * The same exact name always returns the same color. Not nickname-resistant.
  */
 export function getAttributionColor(name: string): {
   bg: string

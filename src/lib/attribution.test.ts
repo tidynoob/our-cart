@@ -27,12 +27,6 @@ describe('getAttributionColor', () => {
     expect(color1).toEqual(color2)
   })
 
-  it('uses full-string hash so "Mitch" and "Mitchell" return the same color', () => {
-    const mitchColor = getAttributionColor('Mitch')
-    const mitchellColor = getAttributionColor('Mitchell')
-    expect(mitchColor).toEqual(mitchellColor)
-  })
-
   it('produces different colors for two typical couple names (e.g., "Mitch" vs "Sarah")', () => {
     const mitchColor = getAttributionColor('Mitch')
     const sarahColor = getAttributionColor('Sarah')
