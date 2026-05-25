@@ -32,8 +32,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **SHOP-01**: User can check off an item (item stays visible, shown crossed out/dimmed)
 - [ ] **SHOP-02**: User can uncheck a previously checked item
-- [ ] **SHOP-03**: User can clear all checked items (removes from both views)
-- [ ] **SHOP-04**: Clear action requires confirmation before executing
+- [x] **SHOP-03**: User can clear all checked items (removes from both views)
+- [x] **SHOP-04**: Clear action requires confirmation before executing
 
 ### Mobile UX
 
@@ -92,8 +92,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHARE-03 | Phase 1 | Pending |
 | SHOP-01 | Phase 3 | Pending |
 | SHOP-02 | Phase 3 | Pending |
-| SHOP-03 | Phase 3 | Pending |
-| SHOP-04 | Phase 3 | Pending |
+| SHOP-03 | Phase 3 | Complete |
+| SHOP-04 | Phase 3 | Complete |
 | UX-01 | Phase 5 | Pending |
 | UX-02 | Phase 5 | Pending |
 | UX-03 | Phase 5 | Pending |

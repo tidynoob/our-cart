@@ -15,7 +15,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Foundation** - Supabase schema, RLS, and shareable list link (completed 2026-05-25)
 - [x] **Phase 2: List Management** - Add, edit, delete, and display items (completed 2026-05-25)
-- [ ] **Phase 3: Shopping Flow** - Check off, uncheck, and clear completed items
+- [x] **Phase 3: Shopping Flow** - Check off, uncheck, and clear completed items (completed 2026-05-25)
 - [ ] **Phase 4: Real-Time Sync** - Live updates across both devices
 - [ ] **Phase 5: Mobile UX** - Phone-first polish, fast entry, and deployment hardening
 
@@ -104,7 +104,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 03-02-PLAN.md — clearChecked store action, conditional "Clear completed (N)" button, confirmation Dialog with "Keep Items" / "Clear Items" (clear vertical slice — SHOP-03, SHOP-04)
+- [x] 03-02-PLAN.md — clearChecked store action, conditional "Clear completed (N)" button, confirmation Dialog with "Keep Items" / "Clear Items" (clear vertical slice — SHOP-03, SHOP-04)
 
 **UI hint**: yes
 
@@ -147,7 +147,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete   | 2026-05-25 |
 | 2. List Management | 5/5 | Complete   | 2026-05-25 |
-| 3. Shopping Flow | 1/2 | In Progress|  |
+| 3. Shopping Flow | 2/2 | Complete   | 2026-05-25 |
 | 4. Real-Time Sync | 0/TBD | Not started | - |
 | 5. Mobile UX | 0/TBD | Not started | - |
 
