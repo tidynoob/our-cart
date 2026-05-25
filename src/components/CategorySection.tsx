@@ -12,6 +12,7 @@ interface CategorySectionProps {
   onDelete: (id: string) => void
   onConfirmDelete: (id: string) => void
   onCancelDelete: () => void
+  onToggle: (id: string) => void
 }
 
 /**
@@ -20,7 +21,7 @@ interface CategorySectionProps {
  *
  * Per D-06: bold section headers with uppercase text.
  * Per accessibility spec: category headers have role="heading" aria-level={3}.
- * Passes edit/delete state and handlers through to each ItemRow.
+ * Passes edit/delete/toggle state and handlers through to each ItemRow.
  */
 export function CategorySection({
   category,
@@ -33,6 +34,7 @@ export function CategorySection({
   onDelete,
   onConfirmDelete,
   onCancelDelete,
+  onToggle,
 }: CategorySectionProps) {
   return (
     <div>
@@ -56,6 +58,7 @@ export function CategorySection({
             onDelete={() => onDelete(item.id)}
             onCancelDelete={onCancelDelete}
             onConfirmDelete={() => onConfirmDelete(item.id)}
+            onToggle={() => onToggle(item.id)}
           />
         ))}
       </div>

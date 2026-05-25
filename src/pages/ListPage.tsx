@@ -9,6 +9,14 @@ import { ShareBanner } from '@/components/ShareBanner'
 import { NamePromptDialog } from '@/components/NamePromptDialog'
 import { AddItemBar } from '@/components/AddItemBar'
 import { CategorySection } from '@/components/CategorySection'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 
 interface List {
   id: string
@@ -32,12 +40,19 @@ export default function ListPage() {
   const [editingItemId, setEditingItemId] = useState<string | null>(null)
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null)
 
+  // Clear dialog state — ephemeral UI, not Zustand
+  const [clearDialogOpen, setClearDialogOpen] = useState(false)
+
   const items = useItemsStore((state) => state.items)
   const itemsLoading = useItemsStore((state) => state.loading)
   const itemsError = useItemsStore((state) => state.error)
   const fetchItems = useItemsStore((state) => state.fetchItems)
   const updateItem = useItemsStore((state) => state.updateItem)
   const deleteItem = useItemsStore((state) => state.deleteItem)
+  const toggleChecked = useItemsStore((state) => state.toggleChecked)
+
+  // Derived from store — no new state field (per research: items.filter(i => i.checked).length)
+  const checkedCount = items.filter((i) => i.checked).length
 
   // Lifecycle step 1: Fetch list by share code
   useEffect(() => {
@@ -119,6 +134,15 @@ export default function ListPage() {
     setDeletingItemId(null)
   }
 
+  // --- Toggle Handler (Phase 3 — SHOP-01/02) ---
+
+  /** Toggle checked state on an item — optimistic update via store. */
+  function handleToggle(id: string) {
+    // Store handles rollback + error state internally; .catch() guards
+    // against unhandled rejections from network-level throws (WR-03).
+    toggleChecked(id).catch(() => {})
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
@@ -179,7 +203,7 @@ export default function ListPage() {
           )}
 
           {/* Items error state — covers both load failures and failed
-              optimistic mutations (add/update/delete). The store sets a
+              optimistic mutations (add/update/delete/toggle/clear). The store sets a
               specific message; Retry re-fetches to recover the canonical
               server state (CR-02). */}
           {itemsError && (
@@ -217,10 +241,54 @@ export default function ListPage() {
               onDelete={handleDelete}
               onConfirmDelete={handleConfirmDelete}
               onCancelDelete={handleCancelDelete}
+              onToggle={handleToggle}
             />
           ))}
+
+          {/* Clear completed button — only rendered when checked items exist (D-06) */}
+          {!itemsLoading && checkedCount > 0 && (
+            <div className="px-4">
+              <Button
+                variant="outline"
+                className="w-full mt-4"
+                onClick={() => setClearDialogOpen(true)}
+              >
+                Clear completed ({checkedCount})
+              </Button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Clear confirmation dialog (D-07) — disablePointerDismissal prevents
+          accidental backdrop tap on mobile while shopping (RESEARCH Pitfall 5) */}
+      <Dialog
+        open={clearDialogOpen}
+        onOpenChange={(open) => setClearDialogOpen(open)}
+        disablePointerDismissal
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>
+              Remove {checkedCount} checked item{checkedCount !== 1 ? 's' : ''}?
+            </DialogTitle>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setClearDialogOpen(false)}>
+              Keep Items
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setClearDialogOpen(false)
+                // clearChecked is Plan 02 — placeholder kept for Plan 02 wiring
+              }}
+            >
+              Clear Items
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
