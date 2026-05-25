@@ -48,7 +48,9 @@ export function getAttributionColor(name: string): {
 
 /**
  * Extracts the first character of a name as an uppercase initial.
+ * Returns '?' for an empty name so the badge is never rendered blank.
  */
 export function getInitials(name: string): string {
+  if (name.length === 0) return '?'
   return name.charAt(0).toUpperCase()
 }

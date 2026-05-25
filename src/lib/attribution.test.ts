@@ -10,6 +10,10 @@ describe('getInitials', () => {
   it('handles single character names', () => {
     expect(getInitials('A')).toBe('A')
   })
+
+  it('returns "?" for an empty name so the badge is never blank', () => {
+    expect(getInitials('')).toBe('?')
+  })
 })
 
 describe('getAttributionColor', () => {
