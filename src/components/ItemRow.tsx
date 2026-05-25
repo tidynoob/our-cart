@@ -12,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Checkbox } from '@/components/ui/checkbox'
+import { cn } from '@/lib/utils'
 import { SELECTABLE_CATEGORIES } from '@/lib/categories'
 
 interface ItemRowProps {
@@ -24,6 +26,7 @@ interface ItemRowProps {
   onConfirmDelete: () => void
   onCancelEdit: () => void
   onSave: (id: string, changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>) => void
+  onToggle: (id: string) => void
 }
 
 /**
@@ -40,6 +43,10 @@ interface ItemRowProps {
  * Per D-09: save when focus leaves the whole row. Enter also saves.
  * Per D-10: trash icon only in edit mode.
  * Per D-11: trash opens delete confirmation (rendered via isDeleting prop).
+ *
+ * Phase 3 additions:
+ * Per D-01: checkbox is a separate gesture target — tapping it does NOT open edit mode.
+ * Per D-05: checked item shows filled checkbox, line-through name, opacity-50 row.
  */
 export function ItemRow({
   item,
@@ -51,6 +58,7 @@ export function ItemRow({
   onConfirmDelete,
   onCancelEdit,
   onSave,
+  onToggle,
 }: ItemRowProps) {
   const rowRef = useRef<HTMLDivElement>(null)
   const selectOpenRef = useRef(false)
@@ -214,7 +222,10 @@ export function ItemRow({
   // Display mode
   return (
     <div
-      className="flex min-h-[48px] cursor-pointer items-center gap-3 border-b border-border px-3 py-2 hover:bg-secondary active:bg-secondary"
+      className={cn(
+        'flex min-h-[48px] cursor-pointer items-center gap-3 border-b border-border px-3 py-2 hover:bg-secondary active:bg-secondary',
+        item.checked && 'opacity-50'
+      )}
       onClick={onTap}
       role="button"
       tabIndex={0}
@@ -225,6 +236,19 @@ export function ItemRow({
         }
       }}
     >
+      {/* Checkbox FIRST — stops propagation so row-body onClick does not fire (D-01) */}
+      <div
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+      >
+        <Checkbox
+          checked={item.checked}
+          onCheckedChange={() => onToggle(item.id)}
+          aria-label={`Mark ${item.name} as ${item.checked ? 'not bought' : 'bought'}`}
+        />
+      </div>
+
+      {/* Attribution badge (position unchanged per D-02) */}
       {item.added_by ? (
         <AttributionBadge name={item.added_by} />
       ) : (
@@ -235,7 +259,12 @@ export function ItemRow({
           ?
         </div>
       )}
-      <span className="flex-1 text-base">{item.name}</span>
+
+      {/* Name — conditional strikethrough per D-05 */}
+      <span className={cn('flex-1 text-base', item.checked && 'line-through')}>
+        {item.name}
+      </span>
+
       {item.quantity && (
         <span className="text-sm text-muted-foreground">{item.quantity}</span>
       )}
