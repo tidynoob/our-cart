@@ -166,10 +166,13 @@ export default function ListPage() {
             <p className="text-sm text-muted-foreground">Loading items...</p>
           )}
 
-          {/* Items error state */}
+          {/* Items error state — covers both load failures and failed
+              optimistic mutations (add/update/delete). The store sets a
+              specific message; Retry re-fetches to recover the canonical
+              server state (CR-02). */}
           {itemsError && (
             <div className="text-sm">
-              <p className="text-red-600" role="alert">Could not load items</p>
+              <p className="text-red-600" role="alert">{itemsError}</p>
               <button
                 type="button"
                 onClick={() => fetchItems(list.id)}
