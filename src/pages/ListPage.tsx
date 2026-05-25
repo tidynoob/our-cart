@@ -93,7 +93,9 @@ export default function ListPage() {
 
   /** Save edited item changes via store action, then exit edit mode. */
   function handleSave(id: string, changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>) {
-    updateItem(id, changes)
+    // Store handles rollback + error state internally; .catch() guards
+    // against unhandled rejections from network-level throws (WR-03).
+    updateItem(id, changes).catch(() => {})
     setEditingItemId(null)
     setDeletingItemId(null)
   }
@@ -105,7 +107,9 @@ export default function ListPage() {
 
   /** Actually delete the item via store action and exit edit/delete mode. */
   function handleConfirmDelete(id: string) {
-    deleteItem(id)
+    // Store handles rollback + error state internally; .catch() guards
+    // against unhandled rejections from network-level throws (WR-03).
+    deleteItem(id).catch(() => {})
     setEditingItemId(null)
     setDeletingItemId(null)
   }
