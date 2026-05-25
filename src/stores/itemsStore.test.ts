@@ -4,8 +4,9 @@ import { useItemsStore } from './itemsStore'
 // Chainable Supabase mock that supports:
 // .from().update().eq() -> Promise (toggleChecked)
 // .from().delete().eq().eq() -> Promise (clearChecked)
-const mockUpdateFn = vi.fn()
-const mockDeleteFn = vi.fn()
+type ResolvableMock = ReturnType<typeof vi.fn> & { _resolvePromise?: unknown }
+const mockUpdateFn = vi.fn() as ResolvableMock
+const mockDeleteFn = vi.fn() as ResolvableMock
 const mockEqFn = vi.fn()
 
 function createMockFrom() {
