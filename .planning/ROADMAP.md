@@ -79,7 +79,7 @@ Plans:
 **Gap Closure**
 
 - [x] 02-04-PLAN.md — Fix NamePromptDialog Save button (@base-ui/react type override bug) and add regression test
-- [ ] 02-05-PLAN.md — Fix inline edit category Select portal blur bug (dropdown exits edit mode)
+- [x] 02-05-PLAN.md — Fix inline edit category Select portal blur bug (dropdown exits edit mode)
 
 **UI hint**: yes
 
@@ -137,7 +137,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete   | 2026-05-25 |
-| 2. List Management | 4/5 | Gap closure | - |
+| 2. List Management | 5/5 | Complete   | 2026-05-25 |
 | 3. Shopping Flow | 0/TBD | Not started | - |
 | 4. Real-Time Sync | 0/TBD | Not started | - |
 | 5. Mobile UX | 0/TBD | Not started | - |
