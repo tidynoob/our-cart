@@ -20,6 +20,7 @@ interface ItemsState {
     changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>
   ) => Promise<void>
   deleteItem: (id: string) => Promise<void>
+  toggleChecked: (id: string) => Promise<void>
 }
 
 export const useItemsStore = create<ItemsState>()((set, get) => ({
@@ -127,6 +128,33 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       // Per-item rollback: re-insert only the deleted item
       // and surface an error so the UI can notify the user (CR-02).
       set((state) => ({ items: [...state.items, prev], error: 'Failed to delete item' }))
+    }
+  },
+
+  toggleChecked: async (id) => {
+    const prev = get().items.find((i) => i.id === id)
+    if (!prev) return
+
+    const nextChecked = !prev.checked
+
+    // Optimistic update: flip checked on matching item
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.id === id ? { ...i, checked: nextChecked } : i
+      ),
+    }))
+
+    const { error } = await supabase
+      .from('items')
+      .update({ checked: nextChecked })
+      .eq('id', id)
+
+    if (error) {
+      // Per-item rollback: restore to prev state and surface error
+      set((state) => ({
+        items: state.items.map((i) => (i.id === id ? prev : i)),
+        error: 'Failed to update item',
+      }))
     }
   },
 }))
