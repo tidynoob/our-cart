@@ -79,14 +79,14 @@ completed: 2026-05-24
 
 # Phase 1 Plan 01: Foundation Scaffold Summary
 
-**Vite 5 + React 19 SPA scaffold with Tailwind v4, shadcn/ui, Supabase client singleton, and Vitest test infrastructure — dev server ready, tests green, awaiting Supabase project creation**
+**Vite 5 + React 19 SPA scaffold with Tailwind v4, shadcn/ui, Supabase client singleton (tables + RLS verified live), and Vitest test infrastructure — dev server ready, tests green, Supabase project provisioned**
 
 ## Performance
 
 - **Duration:** ~7 min
 - **Started:** 2026-05-24T21:47:10Z
 - **Completed:** 2026-05-24T21:54:10Z
-- **Tasks:** 1 of 2 complete (Task 2 awaiting user action — Supabase setup)
+- **Tasks:** 2 of 2 complete
 - **Files modified:** 23 files created
 
 ## Accomplishments
@@ -101,9 +101,7 @@ completed: 2026-05-24
 ## Task Commits
 
 1. **Task 1: Scaffold Vite project, install all dependencies, configure build** - `d6e9180` (feat)
-2. **Task 2: Supabase setup** - AWAITING USER — checkpoint:human-action
-
-**Plan metadata:** (pending — committed after checkpoint completion)
+2. **Task 2: Supabase setup** - COMPLETE (user action) — tables verified live against Supabase API
 
 ## Files Created/Modified
 - `package.json` - Project manifest with all locked dependency versions
@@ -201,12 +199,12 @@ create policy "anon_insert_items" on items for insert to anon
 
 ## Next Phase Readiness
 - Task 1 complete: dev server ready (`npm run dev`), tests green, all config files in place
-- Task 2 blocked: requires Supabase project creation and env vars before any DB calls work
-- Plans 02 and 03 can begin after Task 2 completes (env vars needed for Supabase queries)
+- Task 2 complete: Supabase project provisioned, `lists` and `items` tables created with RLS + 2 anon policies each, `.env.local` populated, tables verified live via API
+- Plans 02 and 03 can proceed — all prerequisites met
 
 ---
 *Phase: 01-foundation*
-*Completed: 2026-05-24 (Task 1 only; Task 2 pending user action)*
+*Completed: 2026-05-24*
 
 ## Self-Check: PASSED
 
