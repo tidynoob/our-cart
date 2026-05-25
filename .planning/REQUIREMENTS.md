@@ -9,12 +9,12 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### List Management
 
-- [ ] **LIST-01**: User can add item with name (required), quantity (optional), and category (optional)
-- [ ] **LIST-02**: User can edit an existing item's name, quantity, or category
-- [ ] **LIST-03**: User can delete an item from the list
-- [ ] **LIST-04**: Items display who added them (initials or color indicator per device/person)
+- [x] **LIST-01**: User can add item with name (required), quantity (optional), and category (optional)
+- [x] **LIST-02**: User can edit an existing item's name, quantity, or category
+- [x] **LIST-03**: User can delete an item from the list
+- [x] **LIST-04**: Items display who added them (initials or color indicator per device/person)
 - [ ] **LIST-05**: Previously added items appear as autocomplete suggestions during entry
-- [ ] **LIST-06**: Items auto-sort by category in the list view (Produce, Dairy, etc.)
+- [x] **LIST-06**: Items auto-sort by category in the list view (Produce, Dairy, etc.)
 
 ### Real-Time Sync
 
@@ -78,12 +78,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| LIST-01 | Phase 2 | Pending |
-| LIST-02 | Phase 2 | Pending |
-| LIST-03 | Phase 2 | Pending |
-| LIST-04 | Phase 2 | Pending |
+| LIST-01 | Phase 2 | Complete |
+| LIST-02 | Phase 2 | Complete |
+| LIST-03 | Phase 2 | Complete |
+| LIST-04 | Phase 2 | Complete |
 | LIST-05 | Phase 5 | Pending |
-| LIST-06 | Phase 2 | Pending |
+| LIST-06 | Phase 2 | Complete |
 | SYNC-01 | Phase 4 | Pending |
 | SYNC-02 | Phase 4 | Pending |
 | SYNC-03 | Phase 4 | Pending |

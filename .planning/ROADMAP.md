@@ -66,7 +66,7 @@ Plans:
 Plans:
 **Wave 1**
 
-- [ ] 02-01-PLAN.md — Schema migration (added_by column + UPDATE/DELETE RLS), shadcn Dialog/Select install, Item type, categories/attribution utilities, itemsStore with optimistic CRUD
+- [x] 02-01-PLAN.md — Schema migration (added_by column + UPDATE/DELETE RLS), shadcn Dialog/Select install, Item type, categories/attribution utilities, itemsStore with optimistic CRUD
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -132,7 +132,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Foundation | 3/3 | Complete   | 2026-05-25 |
-| 2. List Management | 0/3 | Planned | - |
+| 2. List Management | 1/3 | In Progress|  |
 | 3. Shopping Flow | 0/TBD | Not started | - |
 | 4. Real-Time Sync | 0/TBD | Not started | - |
 | 5. Mobile UX | 0/TBD | Not started | - |
