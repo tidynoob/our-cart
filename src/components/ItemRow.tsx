@@ -53,6 +53,7 @@ export function ItemRow({
   onSave,
 }: ItemRowProps) {
   const rowRef = useRef<HTMLDivElement>(null)
+  const selectOpenRef = useRef(false)
   const [editName, setEditName] = useState('')
   const [editQuantity, setEditQuantity] = useState('')
   const [editCategory, setEditCategory] = useState('')
@@ -104,6 +105,7 @@ export function ItemRow({
    */
   const handleRowBlur = useCallback(() => {
     setTimeout(() => {
+      if (selectOpenRef.current) return
       if (rowRef.current && !rowRef.current.contains(document.activeElement)) {
         handleSave()
       }
@@ -168,6 +170,7 @@ export function ItemRow({
           <Select
             value={editCategory}
             onValueChange={(val) => setEditCategory(val ?? '')}
+            onOpenChange={(open) => { selectOpenRef.current = open }}
           >
             <SelectTrigger
               className="h-8 flex-1"
