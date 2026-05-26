@@ -26,14 +26,48 @@ vi.mock('@base-ui/react/checkbox', () => ({
   },
 }))
 
-// Mock lucide-react Check icon
+// Mock lucide-react icons
 vi.mock('lucide-react', async () => {
   const actual = await vi.importActual<typeof import('lucide-react')>('lucide-react')
   return {
     ...actual,
     Check: () => <svg data-testid="check-icon" />,
+    Trash2: () => <svg data-testid="trash-icon" />,
+    ChevronDownIcon: () => <svg data-testid="chevron-down" />,
+    CheckIcon: () => <svg data-testid="check-icon-select" />,
+    ChevronUpIcon: () => <svg data-testid="chevron-up" />,
   }
 })
+
+// Mock @base-ui/react/select to render real DOM with className passthrough
+vi.mock('@base-ui/react/select', () => ({
+  Select: {
+    Root: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => (
+      <div data-slot="select-root" {...props}>{children}</div>
+    ),
+    Trigger: ({ children, className, ...props }: { children: React.ReactNode; className?: string; [key: string]: unknown }) => (
+      <button data-slot="select-trigger" className={className} {...props}>{children}</button>
+    ),
+    Value: ({ children, placeholder, className, ...props }: { children?: React.ReactNode; placeholder?: string; className?: string; [key: string]: unknown }) => (
+      <span data-slot="select-value" className={className} {...props}>{placeholder}</span>
+    ),
+    Icon: ({ render }: { render: React.ReactElement }) => render,
+    Portal: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    Positioner: ({ children }: { children: React.ReactNode; [key: string]: unknown }) => <div>{children}</div>,
+    Popup: ({ children }: { children: React.ReactNode; [key: string]: unknown }) => <div>{children}</div>,
+    List: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Item: ({ children, value }: { children: React.ReactNode; value: string; [key: string]: unknown }) => (
+      <div data-slot="select-item" data-value={value}>{children}</div>
+    ),
+    ItemText: ({ children }: { children: React.ReactNode; [key: string]: unknown }) => <span>{children}</span>,
+    ItemIndicator: () => null,
+    Separator: () => <hr />,
+    ScrollUpArrow: () => null,
+    ScrollDownArrow: () => null,
+    GroupLabel: () => null,
+    Group: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  },
+}))
 
 const baseItem: Item = {
   id: 'item-1',
@@ -111,5 +145,12 @@ describe('ItemRow display mode — checked visual state', () => {
 })
 
 describe('ItemRow tap targets', () => {
-  it.todo('edit mode Category Select trigger has h-11 class (UX-02)')
+  it('edit mode Category Select trigger has h-11 class (UX-02)', () => {
+    render(<ItemRow {...defaultProps} isEditing={true} />)
+
+    // Find the SelectTrigger by data-slot attribute
+    const trigger = document.querySelector('[data-slot="select-trigger"]')
+    expect(trigger).not.toBeNull()
+    expect(trigger!.className).toContain('h-11')
+  })
 })

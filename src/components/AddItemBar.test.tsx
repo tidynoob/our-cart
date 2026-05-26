@@ -56,8 +56,41 @@ vi.mock('lucide-react', async () => {
   return {
     ...actual,
     Plus: () => <svg data-testid="plus-icon" />,
+    ChevronDownIcon: () => <svg data-testid="chevron-down" />,
+    CheckIcon: () => <svg data-testid="check-icon" />,
+    ChevronUpIcon: () => <svg data-testid="chevron-up" />,
   }
 })
+
+// Mock @base-ui/react/select to render real DOM with className passthrough
+vi.mock('@base-ui/react/select', () => ({
+  Select: {
+    Root: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => (
+      <div data-slot="select-root" {...props}>{children}</div>
+    ),
+    Trigger: ({ children, className, ...props }: { children: React.ReactNode; className?: string; [key: string]: unknown }) => (
+      <button data-slot="select-trigger" className={className} {...props}>{children}</button>
+    ),
+    Value: ({ children, placeholder, className, ...props }: { children?: React.ReactNode; placeholder?: string; className?: string; [key: string]: unknown }) => (
+      <span data-slot="select-value" className={className} {...props}>{placeholder}</span>
+    ),
+    Icon: ({ render }: { render: React.ReactElement }) => render,
+    Portal: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    Positioner: ({ children }: { children: React.ReactNode; [key: string]: unknown }) => <div>{children}</div>,
+    Popup: ({ children }: { children: React.ReactNode; [key: string]: unknown }) => <div>{children}</div>,
+    List: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+    Item: ({ children, value }: { children: React.ReactNode; value: string; [key: string]: unknown }) => (
+      <div data-slot="select-item" data-value={value}>{children}</div>
+    ),
+    ItemText: ({ children }: { children: React.ReactNode; [key: string]: unknown }) => <span>{children}</span>,
+    ItemIndicator: () => null,
+    Separator: () => <hr />,
+    ScrollUpArrow: () => null,
+    ScrollDownArrow: () => null,
+    GroupLabel: () => null,
+    Group: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  },
+}))
 
 describe('AddItemBar autocomplete', () => {
   beforeEach(() => {
@@ -82,5 +115,26 @@ describe('AddItemBar tap targets', () => {
     mockSuggestionData = []
   })
 
-  it.todo('AddItemBar Category Select trigger has h-11 class (UX-02)')
+  it('AddItemBar Category Select trigger has h-11 class (UX-02)', async () => {
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    // Click "More details" to expand the category/quantity section
+    const moreBtn = screen.getByText('More details')
+    await user.click(moreBtn)
+
+    // Find the SelectTrigger by data-slot attribute
+    const trigger = document.querySelector('[data-slot="select-trigger"]')
+    expect(trigger).not.toBeNull()
+    expect(trigger!.className).toContain('h-11')
+  })
+
+  it('"More details" toggle has min-h-[44px] tap target class (UX-02)', () => {
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    const moreBtn = screen.getByText('More details')
+    expect(moreBtn.className).toContain('min-h-[44px]')
+    expect(moreBtn.className).toContain('flex')
+    expect(moreBtn.className).toContain('items-center')
+  })
 })
