@@ -196,6 +196,60 @@ describe('AddItemBar autocomplete', () => {
   })
 })
 
+describe('AddItemBar auto-expand on suggestion selection', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockSuggestionData = []
+  })
+
+  it('expands More Details panel when suggestion has category/quantity (UAT gap)', async () => {
+    mockSuggestionData = [
+      { name: 'Milk', category: 'Dairy', quantity: '2' },
+    ]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    const input = screen.getByPlaceholderText('Add an item...')
+    await user.type(input, 'mi')
+
+    await waitFor(() => {
+      expect(screen.getByText('Milk')).toBeDefined()
+    })
+
+    await user.click(screen.getByText('Milk'))
+
+    // Panel should have expanded — "Less details" text proves it
+    expect(screen.getByText('Less details')).toBeDefined()
+    // Quantity input should be visible and populated
+    const qtyInput = screen.getByDisplayValue('2')
+    expect(qtyInput).toBeDefined()
+    // Name should be populated
+    expect((input as HTMLInputElement).value).toBe('Milk')
+  })
+
+  it('keeps panel collapsed when suggestion has no category or quantity', async () => {
+    mockSuggestionData = [
+      { name: 'Bread', category: null, quantity: null },
+    ]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    const input = screen.getByPlaceholderText('Add an item...')
+    await user.type(input, 'br')
+
+    await waitFor(() => {
+      expect(screen.getByText('Bread')).toBeDefined()
+    })
+
+    await user.click(screen.getByText('Bread'))
+
+    // Panel should stay collapsed — "More details" still visible
+    expect(screen.getByText('More details')).toBeDefined()
+    // No quantity input visible
+    expect(screen.queryByDisplayValue('')).toBeNull()
+  })
+})
+
 describe('AddItemBar tap targets', () => {
   beforeEach(() => {
     vi.clearAllMocks()
