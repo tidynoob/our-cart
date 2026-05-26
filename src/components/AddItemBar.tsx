@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus } from 'lucide-react'
 import { useItemsStore } from '@/stores/itemsStore'
+import { supabase } from '@/lib/supabase'
 import { SELECTABLE_CATEGORIES } from '@/lib/categories'
 import { Input } from '@/components/ui/input'
 import { buttonVariants } from '@/components/ui/button'
@@ -11,6 +12,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { AutocompleteSuggestions } from '@/components/AutocompleteSuggestions'
+import type { SuggestionItem } from '@/components/AutocompleteSuggestions'
 
 interface AddItemBarProps {
   listId: string
@@ -38,6 +41,77 @@ export function AddItemBar({ listId, addedBy, disabled = false }: AddItemBarProp
   const [category, setCategory] = useState('')
   const [expanded, setExpanded] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [distinctItems, setDistinctItems] = useState<SuggestionItem[]>([])
+  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([])
+  const [focusedIndex, setFocusedIndex] = useState(-1)
+
+  // Fetch distinct item names on mount for autocomplete (D-01)
+  useEffect(() => {
+    async function loadDistinctItems() {
+      const { data } = await supabase
+        .from('items')
+        .select('name, category, quantity')
+        .eq('list_id', listId)
+        .order('created_at', { ascending: false })
+      if (data) {
+        // Deduplicate by lowercase name, keeping most recent (first)
+        const seen = new Set<string>()
+        const deduped = data.filter((item) => {
+          const key = item.name.toLowerCase()
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        setDistinctItems(deduped)
+      }
+    }
+    loadDistinctItems()
+  }, [listId])
+
+  // Local prefix filter for autocomplete (D-02)
+  function handleNameChange(value: string) {
+    setName(value)
+    if (value.trim().length === 0) {
+      setSuggestions([])
+      setFocusedIndex(-1)
+      return
+    }
+    const lower = value.toLowerCase()
+    const matches = distinctItems
+      .filter((item) => item.name.toLowerCase().startsWith(lower))
+      .slice(0, 8)
+    setSuggestions(matches)
+    setFocusedIndex(-1)
+  }
+
+  // Keyboard navigation for autocomplete dropdown
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (suggestions.length === 0) return
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setFocusedIndex((i) => (i < suggestions.length - 1 ? i + 1 : 0))
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setFocusedIndex((i) => (i > 0 ? i - 1 : suggestions.length - 1))
+    } else if (e.key === 'Enter' && focusedIndex >= 0) {
+      e.preventDefault()
+      handleSuggestionSelect(suggestions[focusedIndex])
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      setSuggestions([])
+      setFocusedIndex(-1)
+    }
+  }
+
+  // Populate fields on suggestion selection — D-04: NO auto-submit
+  function handleSuggestionSelect(item: SuggestionItem) {
+    setName(item.name)
+    if (item.category) setCategory(item.category)
+    if (item.quantity) setQuantity(item.quantity)
+    setSuggestions([])
+    setFocusedIndex(-1)
+  }
 
   // The form is inert while submitting or while externally disabled
   // (e.g., before the user's name is set — WR-04).
@@ -65,6 +139,8 @@ export function AddItemBar({ listId, addedBy, disabled = false }: AddItemBarProp
       setQuantity('')
       setCategory('')
       setExpanded(false)
+      setSuggestions([])
+      setFocusedIndex(-1)
     } finally {
       setSubmitting(false)
     }
@@ -72,23 +148,39 @@ export function AddItemBar({ listId, addedBy, disabled = false }: AddItemBarProp
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-2">
-      <div className="flex items-center gap-2">
-        <Input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="Add an item..."
-          disabled={isInert}
-          className="min-h-[48px] flex-1 text-base"
-        />
-        <button
-          type="submit"
-          disabled={isInert}
-          className={buttonVariants({ className: 'h-12 w-12' })}
-          aria-label="Add item"
-        >
-          <Plus className="size-6" />
-        </button>
+      <div className="relative">
+        <div className="flex items-center gap-2">
+          <Input
+            type="text"
+            value={name}
+            onChange={(e) => handleNameChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onBlur={() => { setSuggestions([]); setFocusedIndex(-1) }}
+            placeholder="Add an item..."
+            disabled={isInert}
+            className="min-h-[48px] flex-1 text-base"
+            role="combobox"
+            aria-expanded={suggestions.length > 0}
+            aria-controls="autocomplete-listbox"
+            aria-activedescendant={focusedIndex >= 0 ? `suggestion-${focusedIndex}` : undefined}
+            aria-autocomplete="list"
+          />
+          <button
+            type="submit"
+            disabled={isInert}
+            className={buttonVariants({ className: 'h-12 w-12' })}
+            aria-label="Add item"
+          >
+            <Plus className="size-6" />
+          </button>
+        </div>
+        {suggestions.length > 0 && (
+          <AutocompleteSuggestions
+            suggestions={suggestions}
+            focusedIndex={focusedIndex}
+            onSelect={handleSuggestionSelect}
+          />
+        )}
       </div>
 
       <button
