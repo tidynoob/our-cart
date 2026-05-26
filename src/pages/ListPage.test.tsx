@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import ListPage from './ListPage'
 import { useItemsStore } from '@/stores/itemsStore'
+import { supabase } from '@/lib/supabase'
 
 const mockEq = vi.fn()
 const mockSingle = vi.fn()
@@ -342,5 +343,68 @@ describe('ListPage — reconnect event handlers', () => {
 
     // fetchItems should have been called at least once more
     expect(mockOrder.mock.calls.length).toBeGreaterThan(initialCallCount)
+  })
+})
+
+describe('ListPage — offline/online syncStatus handlers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockItemsResponse = []
+    useItemsStore.setState({ items: [], loading: false, error: null, syncStatus: 'connecting', channel: null })
+    localStorage.setItem('our-cart-name-list-id-1', 'TestUser')
+  })
+
+  afterEach(() => {
+    localStorage.removeItem('our-cart-name-list-id-1')
+  })
+
+  it('sets syncStatus to "reconnecting" immediately on window offline event (SYNC-03)', async () => {
+    setupListWithItems([])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    // Allow SUBSCRIBED callback (setTimeout(0)) to fire
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10))
+    })
+
+    // Dispatch offline event
+    await act(async () => {
+      window.dispatchEvent(new Event('offline'))
+    })
+
+    expect(useItemsStore.getState().syncStatus).toBe('reconnecting')
+  })
+
+  it('re-subscribes on window online event (SYNC-03)', async () => {
+    setupListWithItems([])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    // Allow SUBSCRIBED callback (setTimeout(0)) to fire
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10))
+    })
+
+    const initialChannelCalls = (supabase.channel as ReturnType<typeof vi.fn>).mock.calls.length
+
+    // Dispatch online event
+    await act(async () => {
+      window.dispatchEvent(new Event('online'))
+    })
+
+    // Allow async settle
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10))
+    })
+
+    // subscribeToList should have been called again (creates a new channel)
+    expect((supabase.channel as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(initialChannelCalls)
   })
 })

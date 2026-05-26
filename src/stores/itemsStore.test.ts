@@ -1,16 +1,36 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useItemsStore } from './itemsStore'
 
 // Chainable Supabase mock that supports:
 // .from().update().eq() -> Promise (toggleChecked)
 // .from().delete().eq().eq() -> Promise (clearChecked)
+// .from().insert().select().single() -> Promise (addItem)
+// .from().select().eq().order() -> Promise (fetchItems)
 type ResolvableMock = ReturnType<typeof vi.fn> & { _resolvePromise?: unknown }
 const mockUpdateFn = vi.fn() as ResolvableMock
 const mockDeleteFn = vi.fn() as ResolvableMock
+const mockInsertFn = vi.fn() as ResolvableMock
+const mockFetchFn = vi.fn() as ResolvableMock
 const mockEqFn = vi.fn()
 
 function createMockFrom() {
   return {
+    insert: (data: unknown) => {
+      mockInsertFn(data)
+      return {
+        select: () => ({
+          single: () => mockInsertFn._resolvePromise ?? Promise.resolve({ data: null, error: null }),
+        }),
+      }
+    },
+    select: () => ({
+      eq: (col: string, val: unknown) => {
+        mockEqFn(col, val)
+        return {
+          order: () => mockFetchFn._resolvePromise ?? Promise.resolve({ data: [], error: null }),
+        }
+      },
+    }),
     update: (changes: unknown) => {
       mockUpdateFn(changes)
       return {
@@ -475,5 +495,99 @@ describe('itemsStore — mergeReducer', () => {
 
     const items = useItemsStore.getState().items
     expect(items).toHaveLength(0)
+  })
+})
+
+describe('itemsStore — mutation offline syncStatus guard', () => {
+  const seedItem = {
+    id: 'offline-item-1',
+    list_id: 'list-offline',
+    name: 'Milk',
+    quantity: null,
+    category: null,
+    checked: false,
+    added_by: 'Test',
+    created_at: new Date().toISOString(),
+  }
+
+  const checkedSeedItem = {
+    ...seedItem,
+    id: 'offline-item-2',
+    checked: true,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useItemsStore.setState({
+      items: [{ ...seedItem }, { ...checkedSeedItem }],
+      loading: false,
+      error: null,
+      syncStatus: 'live',
+      channel: null,
+    })
+    mockUpdateFn._resolvePromise = undefined
+    mockDeleteFn._resolvePromise = undefined
+    mockInsertFn._resolvePromise = undefined
+    mockFetchFn._resolvePromise = undefined
+    resetCapturedCb()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('addItem error + offline sets syncStatus to "reconnecting" (SYNC-03)', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    mockInsertFn._resolvePromise = Promise.resolve({ data: null, error: { message: 'net err' } })
+
+    await useItemsStore.getState().addItem('list-offline', 'Bread')
+
+    expect(useItemsStore.getState().syncStatus).toBe('reconnecting')
+  })
+
+  it('updateItem error + offline sets syncStatus to "reconnecting" (SYNC-03)', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    mockUpdateFn._resolvePromise = Promise.resolve({ data: null, error: { message: 'net err' } })
+
+    await useItemsStore.getState().updateItem('offline-item-1', { name: 'Almond Milk' })
+
+    expect(useItemsStore.getState().syncStatus).toBe('reconnecting')
+  })
+
+  it('deleteItem error + offline sets syncStatus to "reconnecting" (SYNC-03)', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    mockDeleteFn._resolvePromise = Promise.resolve({ data: null, error: { message: 'net err' } })
+
+    await useItemsStore.getState().deleteItem('offline-item-1')
+
+    expect(useItemsStore.getState().syncStatus).toBe('reconnecting')
+  })
+
+  it('toggleChecked error + offline sets syncStatus to "reconnecting" (SYNC-03)', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    mockUpdateFn._resolvePromise = Promise.resolve({ data: null, error: { message: 'net err' } })
+
+    await useItemsStore.getState().toggleChecked('offline-item-1')
+
+    expect(useItemsStore.getState().syncStatus).toBe('reconnecting')
+  })
+
+  it('clearChecked error + offline sets syncStatus to "reconnecting" (SYNC-03)', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(false)
+    mockDeleteFn._resolvePromise = Promise.resolve({ data: null, error: { message: 'net err' } })
+
+    await useItemsStore.getState().clearChecked('list-offline')
+
+    expect(useItemsStore.getState().syncStatus).toBe('reconnecting')
+  })
+
+  it('mutation error + online does NOT change syncStatus to "reconnecting" (SYNC-03)', async () => {
+    vi.spyOn(navigator, 'onLine', 'get').mockReturnValue(true)
+    mockUpdateFn._resolvePromise = Promise.resolve({ data: null, error: { message: 'net err' } })
+
+    await useItemsStore.getState().toggleChecked('offline-item-1')
+
+    // syncStatus should remain 'live' (not changed to 'reconnecting')
+    expect(useItemsStore.getState().syncStatus).toBe('live')
   })
 })
