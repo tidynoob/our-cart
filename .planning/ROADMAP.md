@@ -128,7 +128,7 @@ Plans:
 
 **Wave 1** *(blocked on Wave 0 completion)*
 
-- [ ] 04-02-PLAN.md — [BLOCKING] Enable supabase_realtime publication for items; add subscribeToList/unsubscribe/syncStatus/channel to itemsStore with idempotent merge reducer; enhance supabase.ts with worker:true (SYNC-01, SYNC-02, SYNC-03)
+- [x] 04-02-PLAN.md — [BLOCKING] Enable supabase_realtime publication for items; add subscribeToList/unsubscribe/syncStatus/channel to itemsStore with idempotent merge reducer; enhance supabase.ts with worker:true (SYNC-01, SYNC-02, SYNC-03)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -160,7 +160,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Foundation | 3/3 | Complete   | 2026-05-25 |
 | 2. List Management | 5/5 | Complete   | 2026-05-25 |
 | 3. Shopping Flow | 2/2 | Complete   | 2026-05-25 |
-| 4. Real-Time Sync | 1/3 | In Progress|  |
+| 4. Real-Time Sync | 2/3 | In Progress|  |
 | 5. Mobile UX | 0/TBD | Not started | - |
 
 ---
