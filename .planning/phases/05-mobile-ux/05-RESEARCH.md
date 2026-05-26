@@ -462,17 +462,11 @@ function handleSuggestionSelect(item: { name: string; category: string | null; q
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Apple touch icon background color**
-   - What we know: The favicon is a purple lightning bolt on a transparent background. The theme-color is `#ffffff`.
-   - What's unclear: Should the 180x180 PNG have a white background (matching theme-color) or a purple background (matching the icon's primary color)?
-   - Recommendation: White background (`#ffffff`) is consistent with the theme-color meta tag and looks better on iOS home screens with light backgrounds. Planner decides.
+1. **Apple touch icon background color** — RESOLVED: White background (`#ffffff`), consistent with theme-color meta tag. Plan 05-02 implements this.
 
-2. **Autocomplete initial state: show suggestions on focus if name is empty?**
-   - What we know: D-02 says filter on typed characters. D-05 says no auto-focus on page load.
-   - What's unclear: If user taps the input with empty text, should all history items be shown (up to 8)?
-   - Recommendation: Only show suggestions when `name.trim().length > 0`. Showing all items on empty tap is unexpected behavior for this type of combobox. Planner decides.
+2. **Autocomplete initial state: show suggestions on focus if name is empty?** — RESOLVED: Only show suggestions when `name.trim().length > 0`. No suggestions on empty input. Plan 05-03 implements this.
 
 ---
 
