@@ -13,7 +13,7 @@ Requirements for initial release. Each maps to roadmap phases.
 - [x] **LIST-02**: User can edit an existing item's name, quantity, or category
 - [x] **LIST-03**: User can delete an item from the list
 - [x] **LIST-04**: Items display who added them (initials or color indicator per device/person)
-- [ ] **LIST-05**: Previously added items appear as autocomplete suggestions during entry
+- [x] **LIST-05**: Previously added items appear as autocomplete suggestions during entry
 - [x] **LIST-06**: Items auto-sort by category in the list view (Produce, Dairy, etc.)
 
 ### Real-Time Sync
@@ -38,7 +38,7 @@ Requirements for initial release. Each maps to roadmap phases.
 ### Mobile UX
 
 - [ ] **UX-01**: Layout is phone-first and responsive (works on desktop too)
-- [ ] **UX-02**: Tap targets are large enough for one-handed use while walking (min 44px)
+- [x] **UX-02**: Tap targets are large enough for one-handed use while walking (min 44px)
 - [ ] **UX-03**: Adding an item takes fewer than 3 taps from app open
 
 ## v2 Requirements
@@ -82,7 +82,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LIST-02 | Phase 2 | Complete |
 | LIST-03 | Phase 2 | Complete |
 | LIST-04 | Phase 2 | Complete |
-| LIST-05 | Phase 5 | Pending |
+| LIST-05 | Phase 5 | Complete |
 | LIST-06 | Phase 2 | Complete |
 | SYNC-01 | Phase 4 | Complete |
 | SYNC-02 | Phase 4 | Complete |
@@ -95,7 +95,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHOP-03 | Phase 3 | Complete |
 | SHOP-04 | Phase 3 | Complete |
 | UX-01 | Phase 5 | Pending |
-| UX-02 | Phase 5 | Pending |
+| UX-02 | Phase 5 | Complete |
 | UX-03 | Phase 5 | Pending |
 
 **Coverage:**

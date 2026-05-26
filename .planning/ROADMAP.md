@@ -151,7 +151,7 @@ Plans:
 Plans:
 **Wave 1** *(test stubs)*
 
-- [ ] 05-01-PLAN.md — Wave 0 test stubs: AddItemBar.test.tsx with 6 stubs for LIST-05 autocomplete + UX-02 tap-targets; ItemRow.test.tsx UX-02 stub (UX-02, LIST-05)
+- [x] 05-01-PLAN.md — Wave 0 test stubs: AddItemBar.test.tsx with 6 stubs for LIST-05 autocomplete + UX-02 tap-targets; ItemRow.test.tsx UX-02 stub (UX-02, LIST-05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -178,7 +178,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. List Management | 5/5 | Complete   | 2026-05-25 |
 | 3. Shopping Flow | 2/2 | Complete   | 2026-05-25 |
 | 4. Real-Time Sync | 4/4 | Complete   | 2026-05-26 |
-| 5. Mobile UX | 0/4 | Not started | - |
+| 5. Mobile UX | 1/4 | In Progress|  |
 
 ---
 *Roadmap created: 2026-05-24*
