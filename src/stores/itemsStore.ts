@@ -303,8 +303,16 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
             const hasItems = get().items.length > 0
             get()
               .fetchItems(listId, { background: hasItems })
-              .finally(() => {
+              .then(() => {
                 if (inFlightListId === listId) inFlightListId = null
+              })
+              .catch(() => {
+                // WR-01 fix: On failure, clear guard immediately so any subsequent
+                // SUBSCRIBED callback can trigger a fresh fetch. Without this, a
+                // SUBSCRIBED callback that fired (and was skipped) while this fetch
+                // was in-flight would leave the user with stale/missing items and
+                // no automatic recovery path.
+                inFlightListId = null
               })
           }
         } else {
