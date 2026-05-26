@@ -107,9 +107,10 @@ export function AddItemBar({ listId, addedBy, disabled = false }: AddItemBarProp
   // Populate fields on suggestion selection — D-04: NO auto-submit
   function handleSuggestionSelect(item: SuggestionItem) {
     setName(item.name)
-    if (item.category) setCategory(item.category)
-    if (item.quantity) setQuantity(item.quantity)
-    if (item.category || item.quantity) setExpanded(true)
+    if (item.category) {
+      setCategory(item.category)
+      setExpanded(true)
+    }
     setSuggestions([])
     setFocusedIndex(-1)
   }

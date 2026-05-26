@@ -202,7 +202,7 @@ describe('AddItemBar auto-expand on suggestion selection', () => {
     mockSuggestionData = []
   })
 
-  it('expands More Details panel when suggestion has category/quantity (UAT gap)', async () => {
+  it('expands More Details panel when suggestion has category (UAT gap)', async () => {
     mockSuggestionData = [
       { name: 'Milk', category: 'Dairy', quantity: '2' },
     ]
@@ -220,11 +220,10 @@ describe('AddItemBar auto-expand on suggestion selection', () => {
 
     // Panel should have expanded — "Less details" text proves it
     expect(screen.getByText('Less details')).toBeDefined()
-    // Quantity input should be visible and populated
-    const qtyInput = screen.getByDisplayValue('2')
-    expect(qtyInput).toBeDefined()
     // Name should be populated
     expect((input as HTMLInputElement).value).toBe('Milk')
+    // Quantity should NOT be pre-filled
+    expect(screen.queryByDisplayValue('2')).toBeNull()
   })
 
   it('keeps panel collapsed when suggestion has no category or quantity', async () => {
