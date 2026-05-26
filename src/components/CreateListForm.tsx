@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { nanoid } from 'nanoid'
 import { supabase } from '@/lib/supabase'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 
 export function CreateListForm() {
   const navigate = useNavigate()
@@ -58,9 +58,9 @@ export function CreateListForm() {
           {error}
         </p>
       )}
-      <Button type="submit" disabled={loading}>
+      <button type="submit" disabled={loading} className={buttonVariants()}>
         {loading ? 'Creating...' : 'Create list'}
-      </Button>
+      </button>
     </form>
   )
 }

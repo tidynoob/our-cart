@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { extractShareCode } from '@/lib/extractShareCode'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 
 // Valid share code pattern: 8 chars, nanoid default alphabet (A-Za-z0-9_-)
 const SHARE_CODE_PATTERN = /^[A-Za-z0-9_-]{8}$/
@@ -45,7 +45,7 @@ export function JoinListForm() {
           {error}
         </p>
       )}
-      <Button type="submit">Join list</Button>
+      <button type="submit" className={buttonVariants()}>Join list</button>
     </form>
   )
 }

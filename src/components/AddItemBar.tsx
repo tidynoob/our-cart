@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import { useItemsStore } from '@/stores/itemsStore'
 import { SELECTABLE_CATEGORIES } from '@/lib/categories'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
+import { buttonVariants } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
@@ -81,14 +81,14 @@ export function AddItemBar({ listId, addedBy, disabled = false }: AddItemBarProp
           disabled={isInert}
           className="min-h-[48px] flex-1 text-base"
         />
-        <Button
+        <button
           type="submit"
           disabled={isInert}
-          className="h-12 w-12"
+          className={buttonVariants({ className: 'h-12 w-12' })}
           aria-label="Add item"
         >
           <Plus className="size-6" />
-        </Button>
+        </button>
       </div>
 
       <button
