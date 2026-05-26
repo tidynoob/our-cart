@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { nanoid } from 'nanoid'
 import { supabase } from '@/lib/supabase'
 import type { Item } from '@/types/item'
 
@@ -45,7 +46,7 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
   },
 
   addItem: async (listId, name, quantity, category, addedBy) => {
-    const tempId = crypto.randomUUID()
+    const tempId = nanoid()
     const optimisticItem: Item = {
       id: tempId,
       list_id: listId,
