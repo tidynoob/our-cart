@@ -296,7 +296,7 @@ describe('ListPage — reconnect event handlers', () => {
     localStorage.removeItem('our-cart-name-list-id-1')
   })
 
-  it('calls fetchItems when document becomes visible (visibilitychange → visible) (SYNC-02)', async () => {
+  it('re-subscribes (which internally fetches) when document becomes visible (visibilitychange → visible) (SYNC-02)', async () => {
     setupListWithItems([])
     renderAtRoute('ABC12345')
 
@@ -305,11 +305,11 @@ describe('ListPage — reconnect event handlers', () => {
       expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
     })
 
-    // Record fetchItems call count after mount (SUBSCRIBED fires via setTimeout(0))
+    // Allow SUBSCRIBED callback (setTimeout(0)) to fire
     await act(async () => {
       await new Promise((r) => setTimeout(r, 10))
     })
-    const initialCallCount = mockOrder.mock.calls.length
+    const initialChannelCalls = (supabase.channel as ReturnType<typeof vi.fn>).mock.calls.length
 
     // Simulate screen wake: visibilityState → visible + dispatch event
     await act(async () => {
@@ -317,8 +317,14 @@ describe('ListPage — reconnect event handlers', () => {
       document.dispatchEvent(new Event('visibilitychange'))
     })
 
-    // fetchItems should have been called at least once more
-    expect(mockOrder.mock.calls.length).toBeGreaterThan(initialCallCount)
+    // Allow async settle for subscribeToList's SUBSCRIBED callback
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10))
+    })
+
+    // WR-02: handleVisibility now calls subscribeToList (not fetchItems directly),
+    // consolidating recovery into a single dedup-guarded path
+    expect((supabase.channel as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(initialChannelCalls)
   })
 
   it('re-subscribes (which internally fetches) on window online event (SYNC-02, SYNC-03)', async () => {

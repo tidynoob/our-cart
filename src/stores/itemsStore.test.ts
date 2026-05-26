@@ -322,7 +322,7 @@ describe('itemsStore — subscribeToList', () => {
     expect(useItemsStore.getState().syncStatus).toBe('live')
 
     // fetchItems must have been called with listId
-    expect(fetchItemsSpy).toHaveBeenCalledWith('list-sync')
+    expect(fetchItemsSpy).toHaveBeenCalledWith('list-sync', { background: true })
   })
 
   it('re-subscribe to a different list is not skipped while the prior list fetch is in flight (CR-01)', () => {
@@ -333,12 +333,12 @@ describe('itemsStore — subscribeToList', () => {
 
     useItemsStore.getState().subscribeToList('list-a')
     getCapturedCb()!('SUBSCRIBED')
-    expect(fetchItemsSpy).toHaveBeenCalledWith('list-a')
+    expect(fetchItemsSpy).toHaveBeenCalledWith('list-a', { background: true })
 
     // Different list while list-a's fetch is still pending — must NOT be skipped
     useItemsStore.getState().subscribeToList('list-b')
     getCapturedCb()!('SUBSCRIBED')
-    expect(fetchItemsSpy).toHaveBeenCalledWith('list-b')
+    expect(fetchItemsSpy).toHaveBeenCalledWith('list-b', { background: true })
     expect(fetchItemsSpy).toHaveBeenCalledTimes(2)
   })
 
