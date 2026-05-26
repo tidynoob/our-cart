@@ -120,7 +120,19 @@ Plans:
   2. After a WebSocket disconnection (e.g., phone screen lock), the app reconnects and re-fetches the current list state automatically
   3. A connection status indicator is visible — the user can tell whether sync is active or reconnecting
 
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+**Wave 0**
+
+- [ ] 04-01-PLAN.md — Wave 0 test stubs: extend itemsStore.test.ts with channel mock + .todo stubs for all SYNC behaviors; extend ListPage.test.tsx channel mock; create SyncStatus.test.tsx
+
+**Wave 1** *(blocked on Wave 0 completion)*
+
+- [ ] 04-02-PLAN.md — [BLOCKING] Enable supabase_realtime publication for items; add subscribeToList/unsubscribe/syncStatus/channel to itemsStore with idempotent merge reducer; enhance supabase.ts with worker:true (SYNC-01, SYNC-02, SYNC-03)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 04-03-PLAN.md — Create SyncStatus component; wire ListPage lifecycle (subscribe-before-fetch, visibilitychange/online reconnect handlers, SyncStatus in header); fill in all test stubs; two-device smoke test (SYNC-02, SYNC-03)
 
 ### Phase 5: Mobile UX
 
@@ -148,7 +160,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Foundation | 3/3 | Complete   | 2026-05-25 |
 | 2. List Management | 5/5 | Complete   | 2026-05-25 |
 | 3. Shopping Flow | 2/2 | Complete   | 2026-05-25 |
-| 4. Real-Time Sync | 0/TBD | Not started | - |
+| 4. Real-Time Sync | 0/3 | Not started | - |
 | 5. Mobile UX | 0/TBD | Not started | - |
 
 ---
@@ -158,3 +170,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 *Phase 2 planned: 2026-05-25 — 3 plans, 3 waves*
 *Phase 2 gap closure: 2026-05-25 — 2 plans (UAT blocker fixes)*
 *Phase 3 planned: 2026-05-25 — 2 plans, 2 waves*
+*Phase 4 planned: 2026-05-26 — 3 plans, 3 waves (Wave 0 + Wave 1 + Wave 2)*
