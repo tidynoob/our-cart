@@ -76,6 +76,15 @@ vi.mock('@/lib/supabase', () => ({
         },
       }
     },
+    channel: vi.fn().mockReturnValue({
+      on: vi.fn().mockReturnThis(),
+      subscribe: vi.fn().mockImplementation((cb: (status: string) => void) => {
+        // Trigger SUBSCRIBED immediately so tests don't hang waiting for it
+        setTimeout(() => cb('SUBSCRIBED'), 0)
+        return {}
+      }),
+    }),
+    removeChannel: vi.fn(),
   },
 }))
 
@@ -172,7 +181,7 @@ describe('ListPage — clear completed flow (D-06, D-07, SHOP-03, SHOP-04)', () 
     vi.clearAllMocks()
     mockItemsResponse = []
     // Reset Zustand store between tests to avoid state leakage
-    useItemsStore.setState({ items: [], loading: false, error: null })
+    useItemsStore.setState({ items: [], loading: false, error: null, syncStatus: 'connecting', channel: null })
     // Provide a stored user name so NamePromptDialog doesn't block rendering
     localStorage.setItem('our-cart-name-list-id-1', 'TestUser')
   })
@@ -272,4 +281,20 @@ describe('ListPage — clear completed flow (D-06, D-07, SHOP-03, SHOP-04)', () 
       expect(mockDeleteEq2).toHaveBeenCalledWith('checked', true)
     })
   })
+})
+
+describe('ListPage — reconnect event handlers', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockItemsResponse = []
+    useItemsStore.setState({ items: [], loading: false, error: null, syncStatus: 'connecting', channel: null })
+    localStorage.setItem('our-cart-name-list-id-1', 'TestUser')
+  })
+
+  afterEach(() => {
+    localStorage.removeItem('our-cart-name-list-id-1')
+  })
+
+  it.todo('calls fetchItems when document becomes visible (visibilitychange → visible) (SYNC-02)')
+  it.todo('calls fetchItems on window online event (SYNC-02)')
 })
