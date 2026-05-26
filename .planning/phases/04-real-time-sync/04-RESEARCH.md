@@ -597,7 +597,12 @@ function SyncStatus() {
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
+
+> All three carry implementation-level fallbacks in Plan 04-02 / verified at the Plan 04-03 smoke test — none block execution.
+> - Q1 → use string-literal status values (`'SUBSCRIBED'` etc.) if the named import is awkward.
+> - Q2 → add `worker: true` with a compile-time fallback (drop it if TS errors; D-07 still covers reconnect).
+> - Q3 → verified by the two-device smoke test in Plan 04-03 Task 3.
 
 1. **Does supabase-js 2.106.1 export `REALTIME_SUBSCRIBE_STATES` and `RealtimePostgresChangesPayload` as named exports?**
    - What we know: These types exist in the realtime-js source at the confirmed GitHub URL.
