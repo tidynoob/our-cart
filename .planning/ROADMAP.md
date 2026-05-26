@@ -147,7 +147,7 @@ Plans:
   3. Adding an item takes fewer than 3 taps from app open on a phone
   4. Previously added items appear as autocomplete suggestions during name entry
 
-**Plans**: 4 plans
+**Plans**: 5 plans
 Plans:
 **Wave 1** *(test stubs)*
 
@@ -165,6 +165,10 @@ Plans:
 
 - [x] 05-04-PLAN.md — Human verify: final automated checks (build, tsc, vitest), phone walkthrough on real device, Vercel deployment confirmation (UX-01, UX-02, UX-03, LIST-05)
 
+**Gap Closure**
+
+- [x] 05-05-PLAN.md — Fix autocomplete auto-expand: handleSuggestionSelect calls setExpanded(true) when suggestion has category/quantity (LIST-05)
+
 **UI hint**: yes
 
 ## Progress
@@ -178,7 +182,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. List Management | 5/5 | Complete   | 2026-05-25 |
 | 3. Shopping Flow | 2/2 | Complete   | 2026-05-25 |
 | 4. Real-Time Sync | 4/4 | Complete   | 2026-05-26 |
-| 5. Mobile UX | 4/4 | Complete   | 2026-05-26 |
+| 5. Mobile UX | 5/5 | Complete   | 2026-05-26 |
 
 ---
 *Roadmap created: 2026-05-24*
@@ -189,3 +193,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 *Phase 3 planned: 2026-05-25 — 2 plans, 2 waves*
 *Phase 4 planned: 2026-05-26 — 3 plans, 3 waves (Wave 0 + Wave 1 + Wave 2)*
 *Phase 5 planned: 2026-05-26 — 4 plans, 4 waves (test stubs + deploy polish + autocomplete + human verify)*
+*Phase 5 gap closure: 2026-05-26 — 1 plan (autocomplete auto-expand fix)*
