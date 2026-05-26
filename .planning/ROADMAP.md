@@ -124,7 +124,7 @@ Plans:
 Plans:
 **Wave 0**
 
-- [ ] 04-01-PLAN.md — Wave 0 test stubs: extend itemsStore.test.ts with channel mock + .todo stubs for all SYNC behaviors; extend ListPage.test.tsx channel mock; create SyncStatus.test.tsx
+- [x] 04-01-PLAN.md — Wave 0 test stubs: extend itemsStore.test.ts with channel mock + .todo stubs for all SYNC behaviors; extend ListPage.test.tsx channel mock; create SyncStatus.test.tsx
 
 **Wave 1** *(blocked on Wave 0 completion)*
 
@@ -160,7 +160,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 1. Foundation | 3/3 | Complete   | 2026-05-25 |
 | 2. List Management | 5/5 | Complete   | 2026-05-25 |
 | 3. Shopping Flow | 2/2 | Complete   | 2026-05-25 |
-| 4. Real-Time Sync | 0/3 | Not started | - |
+| 4. Real-Time Sync | 1/3 | In Progress|  |
 | 5. Mobile UX | 0/TBD | Not started | - |
 
 ---

@@ -18,9 +18,9 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Real-Time Sync
 
-- [ ] **SYNC-01**: Changes (add, edit, check off, delete, clear) appear on both devices within 2 seconds
-- [ ] **SYNC-02**: App reconnects and re-fetches after WebSocket disconnection (e.g., screen lock on mobile)
-- [ ] **SYNC-03**: Connection status indicator shows whether sync is active
+- [x] **SYNC-01**: Changes (add, edit, check off, delete, clear) appear on both devices within 2 seconds
+- [x] **SYNC-02**: App reconnects and re-fetches after WebSocket disconnection (e.g., screen lock on mobile)
+- [x] **SYNC-03**: Connection status indicator shows whether sync is active
 
 ### Sharing
 
@@ -84,9 +84,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LIST-04 | Phase 2 | Complete |
 | LIST-05 | Phase 5 | Pending |
 | LIST-06 | Phase 2 | Complete |
-| SYNC-01 | Phase 4 | Pending |
-| SYNC-02 | Phase 4 | Pending |
-| SYNC-03 | Phase 4 | Pending |
+| SYNC-01 | Phase 4 | Complete |
+| SYNC-02 | Phase 4 | Complete |
+| SYNC-03 | Phase 4 | Complete |
 | SHARE-01 | Phase 1 | Pending |
 | SHARE-02 | Phase 1 | Pending |
 | SHARE-03 | Phase 1 | Pending |
