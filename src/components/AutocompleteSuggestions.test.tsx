@@ -21,8 +21,8 @@ describe('AutocompleteSuggestions', () => {
     )
 
     const listbox = screen.getByRole('listbox')
-    expect(listbox).toBeInTheDocument()
-    expect(listbox).toHaveAttribute('id', 'autocomplete-listbox')
+    expect(listbox).toBeDefined()
+    expect(listbox.getAttribute('id')).toBe('autocomplete-listbox')
 
     const options = screen.getAllByRole('option')
     expect(options).toHaveLength(3)
@@ -37,12 +37,12 @@ describe('AutocompleteSuggestions', () => {
       />
     )
 
-    expect(screen.getByText('Milk')).toBeInTheDocument()
-    expect(screen.getByText('Dairy')).toBeInTheDocument()
-    expect(screen.getByText('Bread')).toBeInTheDocument()
-    expect(screen.getByText('Bakery')).toBeInTheDocument()
+    expect(screen.getByText('Milk')).toBeDefined()
+    expect(screen.getByText('Dairy')).toBeDefined()
+    expect(screen.getByText('Bread')).toBeDefined()
+    expect(screen.getByText('Bakery')).toBeDefined()
     // Eggs has no category — should not show category text
-    expect(screen.getByText('Eggs')).toBeInTheDocument()
+    expect(screen.getByText('Eggs')).toBeDefined()
   })
 
   it('applies aria-selected to the focused option', () => {
@@ -55,9 +55,9 @@ describe('AutocompleteSuggestions', () => {
     )
 
     const options = screen.getAllByRole('option')
-    expect(options[0]).toHaveAttribute('aria-selected', 'false')
-    expect(options[1]).toHaveAttribute('aria-selected', 'true')
-    expect(options[2]).toHaveAttribute('aria-selected', 'false')
+    expect(options[0].getAttribute('aria-selected')).toBe('false')
+    expect(options[1].getAttribute('aria-selected')).toBe('true')
+    expect(options[2].getAttribute('aria-selected')).toBe('false')
   })
 
   it('calls onSelect when an option is clicked', async () => {
