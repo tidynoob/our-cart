@@ -3,7 +3,7 @@ status: complete
 phase: 02-list-management
 source: [02-01-SUMMARY.md, 02-02-SUMMARY.md, 02-03-SUMMARY.md, 02-04-SUMMARY.md]
 started: 2026-05-25T18:00:00.000Z
-updated: 2026-05-25T18:15:00.000Z
+updated: 2026-05-25T19:35:00.000Z
 ---
 
 ## Current Test
@@ -34,9 +34,8 @@ result: pass
 
 ### 6. Inline edit an item
 expected: Tap an item row to enter edit mode. Name, quantity, and category fields become editable. Change a value and click/tap outside the row (or press Enter) — the item updates. Clicking between fields within the row does NOT trigger a premature save.
-result: issue
-reported: "I can't edit the category. When I click the 'Dairy' (for example) it closes the item row"
-severity: major
+result: pass
+note: "Re-tested 2026-05-25 after selectOpenRef fix. Category dropdown selection no longer closes the edit row. Confirmed pass by user."
 
 ### 7. Delete an item
 expected: While in edit mode, tap the trash icon. An inline confirmation appears ("Delete this item?") with Cancel and Delete buttons. Cancel returns to edit mode. Delete removes the item from the list.
@@ -49,15 +48,16 @@ result: pass
 ## Summary
 
 total: 8
-passed: 7
-issues: 1
+passed: 8
+issues: 0
 pending: 0
 skipped: 0
 
 ## Gaps
 
 - truth: "Category select in inline edit mode should open dropdown without exiting edit mode"
-  status: diagnosed
+  status: resolved
+  resolved: 2026-05-25
   reason: "User reported: I can't edit the category. When I click the 'Dairy' (for example) it closes the item row"
   severity: major
   test: 6

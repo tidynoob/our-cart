@@ -1,8 +1,10 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "NamePromptDialog reappears on refresh (localStorage not persisting) and does not close after Save"
 created: 2026-05-25T00:00:00Z
 updated: 2026-05-25T00:10:00Z
+resolved: 2026-05-25
+resolution: "NamePromptDialog uses native <button type=\"submit\"> with buttonVariants() className instead of @base-ui Button primitive. type=submit survives, form submits, handleSave writes localStorage and closes dialog."
 ---
 
 ## Current Focus
