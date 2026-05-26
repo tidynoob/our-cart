@@ -6,7 +6,7 @@ import { useItemsStore } from './itemsStore'
 // .from().delete().eq().eq() -> Promise (clearChecked)
 // .from().insert().select().single() -> Promise (addItem)
 // .from().select().eq().order() -> Promise (fetchItems)
-type ResolvableMock = ReturnType<typeof vi.fn> & { _resolvePromise?: unknown }
+type ResolvableMock = ReturnType<typeof vi.fn> & { _resolvePromise?: Promise<unknown> }
 const mockUpdateFn = vi.fn() as ResolvableMock
 const mockDeleteFn = vi.fn() as ResolvableMock
 const mockInsertFn = vi.fn() as ResolvableMock

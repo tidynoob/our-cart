@@ -90,7 +90,7 @@ export default function ListPage() {
 
     // D-05: subscribe before fetch — store's subscribeToList opens channel,
     // then calls fetchItems internally on SUBSCRIBED (D-06). No separate fetchItems() call here.
-    const { subscribeToList: subscribe, unsubscribe: unsub } = useItemsStore.getState()
+    const { subscribeToList: subscribe } = useItemsStore.getState()
     subscribe(list.id)
 
     const storedName = localStorage.getItem(`our-cart-name-${list.id}`)
