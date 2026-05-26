@@ -159,7 +159,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 05-03-PLAN.md — Autocomplete feature: AutocompleteSuggestions.tsx component, AddItemBar wired with local state + Supabase fetch on mount + prefix filter + keyboard nav + selection handler (no auto-submit); fill LIST-05 stubs (LIST-05, UX-03)
+- [x] 05-03-PLAN.md — Autocomplete feature: AutocompleteSuggestions.tsx component, AddItemBar wired with local state + Supabase fetch on mount + prefix filter + keyboard nav + selection handler (no auto-submit); fill LIST-05 stubs (LIST-05, UX-03)
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
@@ -178,7 +178,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. List Management | 5/5 | Complete   | 2026-05-25 |
 | 3. Shopping Flow | 2/2 | Complete   | 2026-05-25 |
 | 4. Real-Time Sync | 4/4 | Complete   | 2026-05-26 |
-| 5. Mobile UX | 2/4 | In Progress|  |
+| 5. Mobile UX | 3/4 | In Progress|  |
 
 ---
 *Roadmap created: 2026-05-24*
