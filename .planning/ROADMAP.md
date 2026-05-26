@@ -147,7 +147,24 @@ Plans:
   3. Adding an item takes fewer than 3 taps from app open on a phone
   4. Previously added items appear as autocomplete suggestions during name entry
 
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+**Wave 1** *(test stubs)*
+
+- [ ] 05-01-PLAN.md — Wave 0 test stubs: AddItemBar.test.tsx with 6 stubs for LIST-05 autocomplete + UX-02 tap-targets; ItemRow.test.tsx UX-02 stub (UX-02, LIST-05)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 05-02-PLAN.md — Deploy polish + tap-target fixes: index.html title/meta/icon, apple-touch-icon.png, SelectTrigger h-11 in AddItemBar + ItemRow, "More details" toggle min-h-[44px]; fill UX-02 stubs (UX-01, UX-02)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 05-03-PLAN.md — Autocomplete feature: AutocompleteSuggestions.tsx component, AddItemBar wired with local state + Supabase fetch on mount + prefix filter + keyboard nav + selection handler (no auto-submit); fill LIST-05 stubs (LIST-05, UX-03)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 05-04-PLAN.md — Human verify: final automated checks (build, tsc, vitest), phone walkthrough on real device, Vercel deployment confirmation (UX-01, UX-02, UX-03, LIST-05)
+
 **UI hint**: yes
 
 ## Progress
@@ -161,7 +178,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. List Management | 5/5 | Complete   | 2026-05-25 |
 | 3. Shopping Flow | 2/2 | Complete   | 2026-05-25 |
 | 4. Real-Time Sync | 4/4 | Complete   | 2026-05-26 |
-| 5. Mobile UX | 0/TBD | Not started | - |
+| 5. Mobile UX | 0/4 | Not started | - |
 
 ---
 *Roadmap created: 2026-05-24*
@@ -171,3 +188,4 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 *Phase 2 gap closure: 2026-05-25 — 2 plans (UAT blocker fixes)*
 *Phase 3 planned: 2026-05-25 — 2 plans, 2 waves*
 *Phase 4 planned: 2026-05-26 — 3 plans, 3 waves (Wave 0 + Wave 1 + Wave 2)*
+*Phase 5 planned: 2026-05-26 — 4 plans, 4 waves (test stubs + deploy polish + autocomplete + human verify)*
