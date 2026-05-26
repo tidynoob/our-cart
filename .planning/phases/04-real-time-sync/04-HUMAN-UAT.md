@@ -1,5 +1,5 @@
 ---
-status: diagnosed
+status: retest
 phase: 04-real-time-sync
 source: [04-VERIFICATION.md]
 started: 2026-05-26
@@ -8,7 +8,7 @@ updated: 2026-05-26
 
 ## Current Test
 
-[testing complete]
+[awaiting human re-test of gap closure fix]
 
 ## Tests
 
@@ -18,8 +18,9 @@ result: pass
 
 ### 2. SyncStatus pill transitions (SYNC-03)
 expected: Green "Live" pill when connected. On network drop the pill shows amber "Reconnecting…"; it returns to green "Live" after the connection recovers.
-result: issue
+result: retest
 reported: "Getting 'Failed to add item' and 'failed to update item' errors but not getting the 'reconnecting' symbol change"
+fix_applied: "04-04 gap closure: added window offline/online event listeners + mutation-offline syncStatus guards"
 severity: major
 
 ### 3. Mobile screen-lock → wake resync (SYNC-02)
@@ -34,15 +35,15 @@ result: pass
 
 total: 4
 passed: 3
-issues: 1
-pending: 0
+issues: 0
+pending: 1
 skipped: 0
 blocked: 0
 
 ## Gaps
 
 - truth: "Green 'Live' pill when connected. On network drop the pill shows amber 'Reconnecting…'; it returns to green 'Live' after the connection recovers."
-  status: failed
+  status: fix-applied
   reason: "User reported: Getting 'Failed to add item' and 'failed to update item' errors but not getting the 'reconnecting' symbol change"
   severity: major
   test: 2
