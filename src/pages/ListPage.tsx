@@ -97,10 +97,13 @@ export default function ListPage() {
     }
 
     // D-07: belt-and-suspenders for mobile Safari screen-lock reconnect.
-    // Event handlers read fetchItems from store state to avoid stale closures.
+    // WR-02 fix: Route through subscribeToList (the full recovery path) instead of
+    // calling fetchItems directly. This consolidates recovery into a single path and
+    // leverages the existing inFlightListId dedup guard, preventing concurrent
+    // unguarded fetches when visibilitychange + online fire in rapid succession.
     function handleVisibility() {
       if (document.visibilityState === 'visible') {
-        useItemsStore.getState().fetchItems(list!.id)
+        useItemsStore.getState().subscribeToList(list!.id)
       }
     }
     // SYNC-03: Immediate network-loss detection via browser 'offline' event.
