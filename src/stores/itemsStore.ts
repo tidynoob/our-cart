@@ -2,11 +2,14 @@ import { create } from 'zustand'
 import { nanoid } from 'nanoid'
 import { supabase } from '@/lib/supabase'
 import type { Item } from '@/types/item'
+import type { RealtimeChannel } from '@supabase/supabase-js'
 
 interface ItemsState {
   items: Item[]
   loading: boolean
   error: string | null
+  syncStatus: 'connecting' | 'live' | 'reconnecting'
+  channel: RealtimeChannel | null
 
   fetchItems: (listId: string) => Promise<void>
   addItem: (
@@ -23,12 +26,16 @@ interface ItemsState {
   deleteItem: (id: string) => Promise<void>
   toggleChecked: (id: string) => Promise<void>
   clearChecked: (listId: string) => Promise<void>
+  subscribeToList: (listId: string) => void
+  unsubscribe: () => void
 }
 
 export const useItemsStore = create<ItemsState>()((set, get) => ({
   items: [],
   loading: false,
   error: null,
+  syncStatus: 'connecting',
+  channel: null,
 
   fetchItems: async (listId) => {
     set({ loading: true, error: null })
@@ -190,5 +197,16 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
         }
       })
     }
+  },
+
+  // Stub: full implementation in Plan 04-02
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  subscribeToList: (_listId: string) => {
+    // No-op stub — implemented in Plan 04-02
+  },
+
+  // Stub: full implementation in Plan 04-02
+  unsubscribe: () => {
+    // No-op stub — implemented in Plan 04-02
   },
 }))

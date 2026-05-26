@@ -37,9 +37,38 @@ function createMockFrom() {
   }
 }
 
+// Capture the subscribe callback so tests can trigger status strings directly.
+// Use vi.hoisted() so these variables are available inside the vi.mock() factory
+// (vi.mock is hoisted to the top of the file by Vitest, before variable declarations).
+const { mockChannelOn, mockChannelSubscribe, mockRemoveChannel, getCapturedCb, resetCapturedCb } =
+  vi.hoisted(() => {
+    let _capturedSubscribeCb: ((status: string) => void) | null = null
+    const _mockChannelOn = vi.fn().mockReturnThis()
+    const _mockChannelSubscribe = vi.fn().mockImplementation((cb: (status: string) => void) => {
+      _capturedSubscribeCb = cb
+      return {}
+    })
+    const _mockRemoveChannel = vi.fn()
+    return {
+      mockChannelOn: _mockChannelOn,
+      mockChannelSubscribe: _mockChannelSubscribe,
+      mockRemoveChannel: _mockRemoveChannel,
+      getCapturedCb: () => _capturedSubscribeCb,
+      resetCapturedCb: () => { _capturedSubscribeCb = null },
+    }
+  })
+
+// Convenience alias — updated by reset in beforeEach
+let capturedSubscribeCb: ((status: string) => void) | null = null
+
 vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: (_table: string) => createMockFrom(),
+    channel: vi.fn().mockReturnValue({
+      on: mockChannelOn,
+      subscribe: mockChannelSubscribe,
+    }),
+    removeChannel: mockRemoveChannel,
   },
 }))
 
@@ -62,10 +91,14 @@ describe('itemsStore — toggleChecked', () => {
       ],
       loading: false,
       error: null,
+      syncStatus: 'connecting',
+      channel: null,
     })
     // Reset resolve overrides
     mockUpdateFn._resolvePromise = undefined
     mockDeleteFn._resolvePromise = undefined
+    resetCapturedCb()
+    capturedSubscribeCb = getCapturedCb()
   })
 
   it('toggleChecked optimistic: immediately sets checked=true before Supabase resolves (SHOP-01)', async () => {
@@ -151,9 +184,11 @@ describe('itemsStore — clearChecked', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
-    useItemsStore.setState({ items: [...seedItems], loading: false, error: null })
+    useItemsStore.setState({ items: [...seedItems], loading: false, error: null, syncStatus: 'connecting', channel: null })
     mockUpdateFn._resolvePromise = undefined
     mockDeleteFn._resolvePromise = undefined
+    resetCapturedCb()
+    capturedSubscribeCb = getCapturedCb()
   })
 
   it('clearChecked optimistic: immediately removes only checked items before Supabase resolves (SHOP-03)', async () => {
@@ -204,4 +239,88 @@ describe('itemsStore — clearChecked', () => {
     // Items unchanged
     expect(useItemsStore.getState().items).toHaveLength(1)
   })
+})
+
+// Seed items shared across SYNC describe blocks
+const syncSeedItems = [
+  {
+    id: 'sync-item-1',
+    list_id: 'list-sync',
+    name: 'Apples',
+    quantity: null,
+    category: null,
+    checked: false,
+    added_by: null,
+    created_at: new Date().toISOString(),
+  },
+  {
+    id: 'sync-item-2',
+    list_id: 'list-sync',
+    name: 'Bread',
+    quantity: null,
+    category: null,
+    checked: false,
+    added_by: null,
+    created_at: new Date().toISOString(),
+  },
+]
+
+describe('itemsStore — subscribeToList', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useItemsStore.setState({
+      items: [...syncSeedItems],
+      loading: false,
+      error: null,
+      syncStatus: 'connecting',
+      channel: null,
+    })
+    resetCapturedCb()
+    capturedSubscribeCb = getCapturedCb()
+  })
+
+  it.todo('sets syncStatus to "live" and calls fetchItems when SUBSCRIBED fires (SYNC-02/03)')
+  it.todo('sets syncStatus to "reconnecting" on CHANNEL_ERROR (SYNC-03)')
+  it.todo('sets syncStatus to "reconnecting" on TIMED_OUT (SYNC-03)')
+  it.todo('sets syncStatus to "reconnecting" on CLOSED (SYNC-03)')
+})
+
+describe('itemsStore — unsubscribe', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useItemsStore.setState({
+      items: [...syncSeedItems],
+      loading: false,
+      error: null,
+      syncStatus: 'connecting',
+      channel: null,
+    })
+    resetCapturedCb()
+    capturedSubscribeCb = getCapturedCb()
+  })
+
+  it.todo('calls supabase.removeChannel with the active channel ref (SYNC-02)')
+  it.todo('sets channel to null and syncStatus to "connecting" after unsubscribe (SYNC-02)')
+})
+
+describe('itemsStore — mergeReducer', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useItemsStore.setState({
+      items: [...syncSeedItems],
+      loading: false,
+      error: null,
+      syncStatus: 'connecting',
+      channel: null,
+    })
+    resetCapturedCb()
+    capturedSubscribeCb = getCapturedCb()
+  })
+
+  it.todo('INSERT from partner: appends new item when id is absent (SYNC-01)')
+  it.todo('INSERT echo: no-op when id already exists in items (SYNC-01)')
+  it.todo('UPDATE from partner: replaces matching row by id (SYNC-01)')
+  it.todo('DELETE from partner: removes item by id from payload.old (SYNC-01)')
+  it.todo('DELETE with only id in payload.old: handles partial old object safely (SYNC-01)')
+  it.todo('multiple DELETE events from clearChecked remove correct rows (SYNC-01)')
 })
