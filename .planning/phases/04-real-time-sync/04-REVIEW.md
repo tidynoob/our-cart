@@ -1,220 +1,121 @@
 ---
 phase: 04-real-time-sync
-reviewed: 2026-05-26T00:00:00Z
+reviewed: 2026-05-26T12:00:00Z
 depth: standard
-files_reviewed: 7
+files_reviewed: 4
 files_reviewed_list:
-  - src/lib/supabase.ts
-  - src/stores/itemsStore.ts
-  - src/stores/itemsStore.test.ts
-  - src/components/SyncStatus.tsx
-  - src/components/SyncStatus.test.tsx
   - src/pages/ListPage.tsx
+  - src/stores/itemsStore.ts
   - src/pages/ListPage.test.tsx
+  - src/stores/itemsStore.test.ts
 findings:
-  critical: 2
-  warning: 4
-  info: 2
-  total: 8
+  critical: 1
+  warning: 3
+  info: 0
+  total: 4
 status: issues_found
 ---
 
-# Phase 04: Code Review Report
+# Phase 04: Code Review Report (04-04 Gap Closure)
 
-**Reviewed:** 2026-05-26T00:00:00Z
+**Reviewed:** 2026-05-26T12:00:00Z
 **Depth:** standard
-**Files Reviewed:** 7
+**Files Reviewed:** 4
 **Status:** issues_found
 
 ## Summary
 
-This phase adds Supabase Postgres Changes real-time sync: `subscribeToList`/`unsubscribe` in the items store, a merge-reducer for INSERT/UPDATE/DELETE events, a `SyncStatus` pill component, and a subscribe-before-fetch lifecycle in ListPage with `visibilitychange`/`online` reconnect handlers.
+This review covers the gap closure work from plan 04-04 (offline/online syncStatus detection). The implementation adds `offline`/`online` browser event handlers in ListPage, belt-and-suspenders `syncStatus` transitions on mutation failures when `navigator.onLine` is false, and corresponding test coverage. The SyncStatus component and core subscription logic are reviewed in context.
 
-The channel lifecycle, merge-reducer dedup logic, and stale-closure avoidance are largely sound. Two correctness bugs were found that can cause real data loss or silent state divergence in production. Four warnings cover robustness gaps that will manifest for real users.
-
----
+The code is generally well-structured with good defensive patterns (idempotent merge reducer, per-item rollback, dedup guards). However, the review identified one critical-tier issue (items flicker away during background re-fetch), two structural warnings around the `inFlightListId` dedup guard, and one warning about the UPDATE branch in the merge reducer creating unnecessary state updates.
 
 ## Critical Issues
 
-### CR-01: `fetchInFlight` is module-level — blocks all subsequent fetches after a navigation or StrictMode remount
+### CR-01: Background re-fetch sets `loading: true`, causing items to disappear and reappear
 
-**File:** `src/stores/itemsStore.ts:9,255-257`
+**File:** `src/stores/itemsStore.ts:47`
+**Issue:** `fetchItems` unconditionally sets `loading: true` on every call. In ListPage, the item list is gated by `!itemsLoading` (line 280: `{!itemsLoading && grouped.map(...)}`), so whenever `fetchItems` is called from a background path -- `handleVisibility` (ListPage line 103), or `handleOnline` -> `subscribeToList` -> SUBSCRIBED (ListPage line 116 / itemsStore line 277) -- the entire items list visually disappears and "Loading items..." appears until the fetch resolves. For a user returning to the app after screen lock or network loss, the grocery list vanishes for the duration of the network round-trip, then reappears. This is a jarring UX defect for the primary shopping use case.
 
-**Issue:** `fetchInFlight` is declared at module scope, not inside the store. Once `fetchItems` sets it `true`, it is only cleared in the `.finally()` callback. If the component unmounts (navigation away, StrictMode double-mount) while the fetch is in-flight, `finally()` still runs and resets the flag — that path is actually fine. However, the critical failure mode is: if the `SUBSCRIBED` callback fires, `fetchInFlight` is set to `true`, and then the `fetchItems` promise rejects with a thrown exception rather than returning `{ error }` (network error, Supabase client throws), the `.finally()` block **does still run**, so that specific case is also okay.
-
-The real bug is subtler: `fetchInFlight` is shared across **all list IDs**. If a user navigates from list A to list B:
-1. List A's `SUBSCRIBED` fires → `fetchInFlight = true`, `fetchItems('list-A')` begins.
-2. React unmounts ListPage for list A, mounts ListPage for list B.
-3. List B's `SUBSCRIBED` fires while list A's fetch is still running → guard sees `fetchInFlight === true` → **skips the initial fetch for list B entirely**.
-4. List B renders with an empty item list until the user manually triggers a reconnect.
-
-This is a silent data-visibility failure: User B opens a list, sees no items, doesn't know whether the list is empty or whether the fetch was skipped.
-
-**Fix:** Scope the guard per-channel or per-listId, not at module level. The cleanest approach is a closure variable inside `subscribeToList`:
-
-```ts
-subscribeToList: (listId: string) => {
-  const existing = get().channel
-  if (existing) supabase.removeChannel(existing)
-
-  set({ syncStatus: 'connecting' })
-  let fetchInFlight = false   // <-- moved inside, scoped to this subscription
-
-  const channel = supabase
-    .channel(`items-${listId}`)
-    .on('postgres_changes', { /* ... */ }, (payload) => { /* merge reducer */ })
-    .subscribe((status) => {
-      if (status === 'SUBSCRIBED') {
-        set({ syncStatus: 'live' })
-        if (!fetchInFlight) {
-          fetchInFlight = true
-          get().fetchItems(listId).finally(() => { fetchInFlight = false })
-        }
-      } else {
-        set({ syncStatus: 'reconnecting' })
-      }
-    })
-
-  set({ channel })
-},
-```
-
-Remove the module-level `let fetchInFlight = false` declaration on line 9.
-
----
-
-### CR-02: `deleteItem` rollback appends to the **end** of the list — re-insert order is wrong
-
-**File:** `src/stores/itemsStore.ts:142-144`
-
-**Issue:** When `deleteItem` fails and rolls back, the restored item is appended to the end of the `items` array:
-
-```ts
-set((state) => ({ items: [...state.items, prev], error: 'Failed to delete item' }))
-```
-
-The items array is ordered by `created_at` ascending (as fetched). Appending `prev` to the end places an item that originally appeared in the middle of the list at the bottom. If the error resolves and the user retries, the visual list order is permanently corrupted for the session — the item appears at the wrong position until the next full re-fetch. For a grocery app where category grouping is derived from `items` order, this can also cause the item to appear in the wrong category section momentarily.
-
-The same issue exists in `clearChecked` rollback (line 198-199): checked items are also appended to the end. That one is less severe because `clearChecked` is a bulk operation and a re-fetch normally follows, but the principle is identical.
-
-**Fix:** Restore the item at its original index:
-
-```ts
-if (error) {
-  set((state) => {
-    const idx = state.items.findIndex((i) => i.id === id)
-    const restored = [...state.items]
-    if (idx === -1) {
-      // Item was concurrently removed — just append
-      restored.push(prev)
-    } else {
-      // This path shouldn't happen (item was optimistically removed above),
-      // but if it does, re-insert at end
-      restored.push(prev)
-    }
-    // Re-insert at original position by using the snapshot index
-    // Better: track the original index before the optimistic removal
-    return { items: restored, error: 'Failed to delete item' }
-  })
-}
-```
-
-More robustly, capture the original index before the optimistic removal:
-
-```ts
-deleteItem: async (id) => {
-  const prevItems = get().items          // snapshot full array
-  const prev = prevItems.find((i) => i.id === id)
-  if (!prev) return
-
-  set((state) => ({ items: state.items.filter((i) => i.id !== id) }))
-
-  const { error } = await supabase.from('items').delete().eq('id', id)
+**Fix:** Add an `isBackgroundFetch` parameter to `fetchItems`, or only set `loading: true` when items are currently empty:
+```typescript
+fetchItems: async (listId, { background = false } = {}) => {
+  if (!background) {
+    set({ loading: true, error: null })
+  } else {
+    set({ error: null })
+  }
+  const { data, error } = await supabase
+    .from('items')
+    .select('*')
+    .eq('list_id', listId)
+    .order('created_at', { ascending: true })
 
   if (error) {
-    // Restore using the full pre-deletion snapshot
-    set({ items: prevItems, error: 'Failed to delete item' })
+    set({ error: 'Failed to load items', loading: false })
+  } else {
+    set({ items: data ?? [], loading: false })
   }
 },
 ```
-
----
+Then pass `{ background: true }` from the SUBSCRIBED callback (when items already exist) and from `handleVisibility`. The initial fetch on first load can use the default `background: false`.
 
 ## Warnings
 
-### WR-01: `subscribeToList` cleans up the existing channel but never awaits the channel's close before opening a new one
+### WR-01: `inFlightListId` dedup guard suppresses needed fetch when prior in-flight fetch fails on same-list re-subscribe
 
-**File:** `src/stores/itemsStore.ts:208-209`
+**File:** `src/stores/itemsStore.ts:274-281`
+**Issue:** When `subscribeToList` is called for the same `listId` while a fetch is already in flight (e.g., `handleOnline` triggers re-subscribe during screen wake), the guard `if (inFlightListId !== listId)` skips the fetch. If the first in-flight fetch subsequently fails (network error, timeout), `inFlightListId` is cleared in `.finally()`, but the second subscription never gets its own fetch. The user ends up with `syncStatus: 'live'` (set by SUBSCRIBED) but stale or missing items, with no automatic retry. The test at `itemsStore.test.ts:328` only tests different list IDs, not this same-list-re-subscribe-with-failure scenario.
 
-**Issue:** `supabase.removeChannel(existing)` is called synchronously, but the Supabase JS client's `removeChannel` initiates an async unsubscription. The new channel is created on the very next line. If the old channel's WebSocket frame is still being sent, both channels may be alive briefly and the new `SUBSCRIBED` callback can fire while the old channel is still delivering events. On fast networks this window is sub-millisecond; on slow mobile connections it can be hundreds of milliseconds. During that window duplicate events could be processed (INSERT dedup guards against this, but UPDATE/DELETE have no dedup).
-
-This is not catastrophic given the app's 2-user scope, but it is a correctness gap on the reconnect path.
-
-**Fix:** Store the Promise returned by `removeChannel` (or check its resolved value) if the Supabase client exposes it, or set `syncStatus: 'connecting'` and delay the new channel creation by a microtask tick:
-
-```ts
-const existing = get().channel
-if (existing) {
-  await supabase.removeChannel(existing)   // returns Promise in supabase-js v2
+**Fix:** Clear `inFlightListId` on error AND schedule a retry, or restructure the guard to allow a second fetch when the first fails:
+```typescript
+if (status === 'SUBSCRIBED') {
+  set({ syncStatus: 'live' })
+  // Always fetch on SUBSCRIBED; dedup via AbortController instead of boolean guard
+  const controller = new AbortController()
+  get()
+    .fetchItems(listId, { signal: controller.signal })
+    .catch(() => {})
 }
 ```
+Alternatively, keep the simple guard but clear it on error so the next SUBSCRIBED (from Supabase's auto-reconnect) triggers a fresh fetch:
+```typescript
+get()
+  .fetchItems(listId)
+  .catch(() => { inFlightListId = null })
+  .finally(() => {
+    if (inFlightListId === listId) inFlightListId = null
+  })
+```
 
-Note: `subscribeToList` is currently `void`-returning. Changing to `async` is safe — callers in `ListPage` do not `await` it but the return value is discarded, so no call-site changes are needed.
-
----
-
-### WR-02: `visibilitychange` handler calls `fetchItems` unconditionally — races with `fetchInFlight` guard only inside `subscribeToList`, not here
+### WR-02: `handleVisibility` calls `fetchItems` directly, bypassing the `inFlightListId` dedup guard
 
 **File:** `src/pages/ListPage.tsx:101-104`
+**Issue:** The `handleVisibility` handler calls `useItemsStore.getState().fetchItems(list!.id)` directly, bypassing the `inFlightListId` guard that only exists inside `subscribeToList`'s SUBSCRIBED callback. When a phone wakes up, both `visibilitychange` and `online` can fire in quick succession. `handleVisibility` fires an unguarded `fetchItems`, and `handleOnline` triggers `subscribeToList` which fires a guarded `fetchItems` on SUBSCRIBED. Since the visibility fetch doesn't set `inFlightListId`, the SUBSCRIBED fetch also fires -- resulting in two concurrent fetches for the same list. While the last-write-wins semantics are correct, the double fetch is wasteful and compounds the CR-01 loading flash (two consecutive flashes if one resolves before the other starts).
 
-**Issue:** The `handleVisibility` and `handleOnline` handlers call `useItemsStore.getState().fetchItems(list!.id)` directly, bypassing the `fetchInFlight` guard that lives inside `subscribeToList`'s `SUBSCRIBED` callback. This means:
-
-1. Tab becomes visible (`visibilitychange` fires).
-2. Supabase Realtime reconnects and `SUBSCRIBED` fires within the same event loop batch.
-3. Both `handleVisibility` and the `SUBSCRIBED` callback call `fetchItems` simultaneously.
-4. Two concurrent `fetchItems` calls run; whichever resolves second wins and overwrites the first result in state. This is a read-read race and is unlikely to corrupt data, but it does generate double network traffic and can cause a brief flicker where `loading: true` is set twice.
-
-The `fetchInFlight` guard comment in the store (line 253) explicitly says it prevents this, but the guard only applies to the `SUBSCRIBED` path — the event handler path is unprotected.
-
-**Fix:** Apply the same `fetchInFlight` guard inside the event handlers (using the per-subscription-scoped variable from CR-01's fix), or funnel resync through a dedicated `resync()` action on the store that applies the guard:
-
-```ts
-// In the store:
-resync: (listId: string) => {
-  if (fetchInFlight) return
-  fetchInFlight = true
-  get().fetchItems(listId).finally(() => { fetchInFlight = false })
-},
-
-// In ListPage:
+**Fix:** Route the visibility handler through the same dedup mechanism, or at minimum check the guard:
+```typescript
 function handleVisibility() {
   if (document.visibilityState === 'visible') {
-    useItemsStore.getState().resync(list!.id)
+    // Re-subscribe is the full recovery path; it dedupes internally
+    useItemsStore.getState().subscribeToList(list!.id)
   }
 }
 ```
+This makes `handleVisibility` and `handleOnline` use the same recovery path, consolidating the dedup logic in one place. The subscription is idempotent (removes existing channel first), so calling it on visibility change is safe.
 
----
+### WR-03: Merge reducer UPDATE branch always creates a new array reference even when no item matches
 
-### WR-03: `UPDATE` merge-reducer does not guard against a missing item — silently no-ops
+**File:** `src/stores/itemsStore.ts:250-258`
+**Issue:** The UPDATE branch of the Realtime merge reducer always returns `{ items: state.items.map(...) }`, creating a new array reference even when no item in the local state matches the updated row's ID (e.g., the item was optimistically deleted). The comment acknowledges this is "intentional no-op when the id is absent locally" but `.map()` returns a new array reference regardless, which Zustand treats as a state change, triggering React re-renders. The DELETE branch (line 260-264) correctly returns `state` (same reference) when there's nothing to delete. The UPDATE branch should follow the same pattern for consistency and to avoid unnecessary renders.
 
-**File:** `src/stores/itemsStore.ts:233-238`
-
-**Issue:** The `UPDATE` branch maps over items and replaces the matching row by `id`. If the item is not found in the current state (e.g., it was optimistically deleted locally while an UPDATE arrived from the partner), `state.items.map(...)` returns the unchanged array with no error. The returning of the unchanged state is correct, but there is a subtle consequence: the updated item data is permanently discarded. If the optimistic delete later rolls back (CR-02 scenario), the item is restored to its **pre-update** state, not the updated state. This means a partner's edit is silently lost.
-
-For a 2-user app this is a known acceptable trade-off (acknowledged in the prompt as intentionally out-of-scope for LWW). However the guard for `DELETE` explicitly handles the missing-id case with an early `return state` and a comment. The missing guard here is an inconsistency that could mislead future maintainers.
-
-**Fix:** Add a comment or a defensive guard:
-
-```ts
+**Fix:**
+```typescript
 if (eventType === 'UPDATE') {
-  const exists = state.items.some((i) => i.id === (newRow as Item).id)
-  // No-op if item was optimistically removed locally — partner's edit is discarded.
-  // Acceptable for 2-user app without LWW (intentional trade-off, see RESEARCH §Conflicts).
-  if (!exists) return state
+  const updatedId = (newRow as Item).id
+  if (!state.items.some((i) => i.id === updatedId)) return state
   return {
     items: state.items.map((i) =>
-      i.id === (newRow as Item).id ? (newRow as Item) : i
+      i.id === updatedId ? (newRow as Item) : i
     ),
   }
 }
@@ -222,82 +123,6 @@ if (eventType === 'UPDATE') {
 
 ---
 
-### WR-04: `unsubscribe` resets `syncStatus` to `'connecting'` — misleads the UI after intentional cleanup
-
-**File:** `src/stores/itemsStore.ts:272-274`
-
-**Issue:** When `unsubscribe()` is called on unmount (ListPage cleanup in `useEffect` return), `syncStatus` is set to `'connecting'`. If the store's state persists across route navigations (Zustand stores are module singletons), the `SyncStatus` pill will briefly show "Connecting…" on the home page or any other page that renders `SyncStatus` but is not inside a list view. This is a cosmetic issue but it can confuse users who see the status pill flicker on non-list pages.
-
-More importantly: if the component re-mounts quickly (React StrictMode, fast route transitions), the `'connecting'` state set by `unsubscribe` could be read by the freshly mounting component before `subscribeToList` resets it, causing a flash of "Connecting…" that races with the next `SUBSCRIBED` callback.
-
-**Fix:** Either reset `syncStatus` to a fourth state like `'idle'` (requires updating `SyncStatus.tsx` to handle it), or do not reset `syncStatus` in `unsubscribe` and instead rely on `subscribeToList` to reset it at the top:
-
-```ts
-unsubscribe: () => {
-  const channel = get().channel
-  if (channel) {
-    supabase.removeChannel(channel)
-    set({ channel: null })  // do NOT reset syncStatus here; subscribeToList owns it
-  }
-},
-```
-
----
-
-## Info
-
-### IN-01: `fetchInFlight` guard test coverage is absent
-
-**File:** `src/stores/itemsStore.test.ts`
-
-**Issue:** There are no tests for the `fetchInFlight` guard behavior — specifically that a second `SUBSCRIBED` event does not trigger a second `fetchItems` call while the first is in-flight. Given that CR-01 identifies a real bug in this exact logic, the lack of a regression test means the bug could be reintroduced after the fix.
-
-**Fix:** Add a test in the `subscribeToList` describe block:
-
-```ts
-it('fetchInFlight guard: does not call fetchItems a second time if SUBSCRIBED fires while a fetch is pending (SYNC-03)', async () => {
-  let resolveFetch!: () => void
-  const fetchSpy = vi.fn().mockImplementation(() => new Promise<void>((res) => { resolveFetch = res }))
-  useItemsStore.setState({ fetchItems: fetchSpy })
-
-  useItemsStore.getState().subscribeToList('list-sync')
-  capturedSubscribeCb = getCapturedCb()
-  capturedSubscribeCb!('SUBSCRIBED')   // first SUBSCRIBED — fetch starts
-  capturedSubscribeCb!('SUBSCRIBED')   // second SUBSCRIBED — should be no-op
-
-  expect(fetchSpy).toHaveBeenCalledTimes(1)
-  resolveFetch()
-})
-```
-
----
-
-### IN-02: `SyncStatus` test mock types `useItemsStore` as accepting only `{ syncStatus: string }` — will break if store shape is extended
-
-**File:** `src/components/SyncStatus.test.tsx:7-9`
-
-**Issue:** The mock narrows the store state parameter type to `{ syncStatus: string }` rather than the full `ItemsState`. This is a test-local simplification that works today, but if a future test in this file needs to assert on other state fields, TypeScript will reject the selector. Additionally, `string` is wider than the actual union `'connecting' | 'live' | 'reconnecting'` — a typo like `selector({ syncStatus: 'conecting' })` would pass TypeScript checks in the test but represent an impossible production state.
-
-**Fix:** Import and use the actual state type:
-
-```ts
-import type { ItemsState } from '@/stores/itemsStore'
-
-vi.mock('@/stores/itemsStore', () => ({
-  useItemsStore: vi.fn((selector: (s: ItemsState) => unknown) =>
-    selector({ syncStatus: 'live' } as ItemsState)
-  ),
-}))
-```
-
-Or narrow to the literal union:
-
-```ts
-type SyncStatusState = { syncStatus: 'connecting' | 'live' | 'reconnecting' }
-```
-
----
-
-_Reviewed: 2026-05-26T00:00:00Z_
+_Reviewed: 2026-05-26T12:00:00Z_
 _Reviewer: Claude (gsd-code-reviewer)_
 _Depth: standard_
