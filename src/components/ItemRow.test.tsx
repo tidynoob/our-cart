@@ -109,3 +109,7 @@ describe('ItemRow display mode — checked visual state', () => {
     expect(defaultProps.onTap).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('ItemRow tap targets', () => {
+  it.todo('edit mode Category Select trigger has h-11 class (UX-02)')
+})
