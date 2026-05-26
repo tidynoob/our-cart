@@ -109,6 +109,7 @@ export function AddItemBar({ listId, addedBy, disabled = false }: AddItemBarProp
     setName(item.name)
     if (item.category) setCategory(item.category)
     if (item.quantity) setQuantity(item.quantity)
+    if (item.category || item.quantity) setExpanded(true)
     setSuggestions([])
     setFocusedIndex(-1)
   }
