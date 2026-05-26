@@ -9,6 +9,7 @@ import { ShareBanner } from '@/components/ShareBanner'
 import { NamePromptDialog } from '@/components/NamePromptDialog'
 import { AddItemBar } from '@/components/AddItemBar'
 import { CategorySection } from '@/components/CategorySection'
+import { SyncStatus } from '@/components/SyncStatus'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -51,6 +52,8 @@ export default function ListPage() {
   const deleteItem = useItemsStore((state) => state.deleteItem)
   const toggleChecked = useItemsStore((state) => state.toggleChecked)
   const clearChecked = useItemsStore((state) => state.clearChecked)
+  const subscribeToList = useItemsStore((state) => state.subscribeToList)
+  const unsubscribe = useItemsStore((state) => state.unsubscribe)
 
   // Derived from store — no new state field (per research: items.filter(i => i.checked).length)
   const checkedCount = items.filter((i) => i.checked).length
@@ -80,17 +83,39 @@ export default function ListPage() {
     fetchList()
   }, [code, navigate])
 
-  // Lifecycle step 2: Once list is loaded, fetch items and load stored name
+  // Lifecycle step 2: Once list is loaded, subscribe-before-fetch (D-05) + reconnect listeners (D-07)
   useEffect(() => {
     if (!list) return
 
-    fetchItems(list.id)
+    // D-05: subscribe before fetch — store's subscribeToList opens channel,
+    // then calls fetchItems internally on SUBSCRIBED (D-06). No separate fetchItems() call here.
+    subscribeToList(list.id)
 
     const storedName = localStorage.getItem(`our-cart-name-${list.id}`)
     if (storedName) {
       setUserName(storedName)
     }
-  }, [list, fetchItems])
+
+    // D-07: belt-and-suspenders for mobile Safari screen-lock reconnect.
+    // Event handlers read fetchItems from store state to avoid stale closures.
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') {
+        useItemsStore.getState().fetchItems(list!.id)
+      }
+    }
+    function handleOnline() {
+      useItemsStore.getState().fetchItems(list!.id)
+    }
+
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('online', handleOnline)
+
+    return () => {
+      unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('online', handleOnline)
+    }
+  }, [list, subscribeToList, unsubscribe])
 
   // --- Edit/Delete Handlers ---
 
@@ -195,7 +220,10 @@ export default function ListPage() {
       )}
 
       <div className="w-full max-w-md p-4">
-        <h1 className="text-2xl font-semibold">{list.name}</h1>
+        <div className="flex items-center justify-between">
+          <h1 className="text-2xl font-semibold">{list.name}</h1>
+          <SyncStatus />
+        </div>
 
         <div className="mt-4 flex flex-col gap-6">
           {/* Add item bar — disabled until the user's name is set so items
