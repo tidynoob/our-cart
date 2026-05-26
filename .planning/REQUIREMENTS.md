@@ -37,7 +37,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 ### Mobile UX
 
-- [ ] **UX-01**: Layout is phone-first and responsive (works on desktop too)
+- [x] **UX-01**: Layout is phone-first and responsive (works on desktop too)
 - [x] **UX-02**: Tap targets are large enough for one-handed use while walking (min 44px)
 - [ ] **UX-03**: Adding an item takes fewer than 3 taps from app open
 
@@ -94,7 +94,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | SHOP-02 | Phase 3 | Complete |
 | SHOP-03 | Phase 3 | Complete |
 | SHOP-04 | Phase 3 | Complete |
-| UX-01 | Phase 5 | Pending |
+| UX-01 | Phase 5 | Complete |
 | UX-02 | Phase 5 | Complete |
 | UX-03 | Phase 5 | Pending |
 

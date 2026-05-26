@@ -155,7 +155,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 05-02-PLAN.md — Deploy polish + tap-target fixes: index.html title/meta/icon, apple-touch-icon.png, SelectTrigger h-11 in AddItemBar + ItemRow, "More details" toggle min-h-[44px]; fill UX-02 stubs (UX-01, UX-02)
+- [x] 05-02-PLAN.md — Deploy polish + tap-target fixes: index.html title/meta/icon, apple-touch-icon.png, SelectTrigger h-11 in AddItemBar + ItemRow, "More details" toggle min-h-[44px]; fill UX-02 stubs (UX-01, UX-02)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -178,7 +178,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. List Management | 5/5 | Complete   | 2026-05-25 |
 | 3. Shopping Flow | 2/2 | Complete   | 2026-05-25 |
 | 4. Real-Time Sync | 4/4 | Complete   | 2026-05-26 |
-| 5. Mobile UX | 1/4 | In Progress|  |
+| 5. Mobile UX | 2/4 | In Progress|  |
 
 ---
 *Roadmap created: 2026-05-24*
