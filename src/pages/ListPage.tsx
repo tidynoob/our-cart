@@ -52,8 +52,6 @@ export default function ListPage() {
   const deleteItem = useItemsStore((state) => state.deleteItem)
   const toggleChecked = useItemsStore((state) => state.toggleChecked)
   const clearChecked = useItemsStore((state) => state.clearChecked)
-  const subscribeToList = useItemsStore((state) => state.subscribeToList)
-  const unsubscribe = useItemsStore((state) => state.unsubscribe)
 
   // Derived from store — no new state field (per research: items.filter(i => i.checked).length)
   const checkedCount = items.filter((i) => i.checked).length
@@ -84,12 +82,16 @@ export default function ListPage() {
   }, [code, navigate])
 
   // Lifecycle step 2: Once list is loaded, subscribe-before-fetch (D-05) + reconnect listeners (D-07)
+  // WR-04 fix: Access action functions via getState() inside the effect body and cleanup
+  // to avoid including them in the dependency array. This prevents potential re-subscribe
+  // loops if a future refactor causes Zustand action references to change.
   useEffect(() => {
     if (!list) return
 
     // D-05: subscribe before fetch — store's subscribeToList opens channel,
     // then calls fetchItems internally on SUBSCRIBED (D-06). No separate fetchItems() call here.
-    subscribeToList(list.id)
+    const { subscribeToList: subscribe, unsubscribe: unsub } = useItemsStore.getState()
+    subscribe(list.id)
 
     const storedName = localStorage.getItem(`our-cart-name-${list.id}`)
     if (storedName) {
@@ -124,12 +126,12 @@ export default function ListPage() {
     window.addEventListener('online', handleOnline)
 
     return () => {
-      unsubscribe()
+      useItemsStore.getState().unsubscribe()
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('offline', handleOffline)
       window.removeEventListener('online', handleOnline)
     }
-  }, [list, subscribeToList, unsubscribe])
+  }, [list]) // Only re-run when the list identity changes
 
   // --- Edit/Delete Handlers ---
 
