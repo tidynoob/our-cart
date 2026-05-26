@@ -181,7 +181,7 @@ export function ItemRow({
             onOpenChange={(open) => { selectOpenRef.current = open }}
           >
             <SelectTrigger
-              className="h-8 flex-1"
+              className="h-11 flex-1"
               onMouseDown={(e) => e.preventDefault()}
             >
               <SelectValue placeholder="Category" />

@@ -94,7 +94,7 @@ export function AddItemBar({ listId, addedBy, disabled = false }: AddItemBarProp
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="self-start text-sm text-muted-foreground hover:text-foreground"
+        className="self-start min-h-[44px] flex items-center text-sm text-muted-foreground hover:text-foreground"
       >
         {expanded ? 'Less details' : 'More details'}
       </button>
@@ -113,7 +113,7 @@ export function AddItemBar({ listId, addedBy, disabled = false }: AddItemBarProp
             value={category}
             onValueChange={(val) => setCategory(val ?? '')}
           >
-            <SelectTrigger className="h-8 flex-1" disabled={isInert}>
+            <SelectTrigger className="h-11 flex-1" disabled={isInert}>
               <SelectValue placeholder="Category" />
             </SelectTrigger>
             <SelectContent>
