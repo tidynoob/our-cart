@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: verifying
-last_updated: "2026-05-26T14:23:08.193Z"
+last_updated: "2026-05-26T15:34:54.044Z"
 last_activity: 2026-05-26
 progress:
   total_phases: 5
   completed_phases: 4
-  total_plans: 13
-  completed_plans: 13
+  total_plans: 14
+  completed_plans: 14
   percent: 80
 ---
 
@@ -56,6 +56,7 @@ Progress: [██████████] 100%
 | Phase 04 P01 | 4 minutes | 2 tasks | 4 files |
 | Phase 04 P04-02 | 3min | 2 tasks | 3 files |
 | Phase 04 P04-03 | 7min | 2 tasks | 4 files |
+| Phase 04 P04-04 | 5min | 2 tasks | 4 files |
 
 ## Accumulated Context
 
@@ -74,6 +75,8 @@ Recent decisions affecting current work:
 - [Phase ?]: clearChecked bulk DELETE uses .eq(list_id).eq(checked=true) scoped by list — snapshot before set() enforced as invariant
 - [Phase ?]: Used vi.hoisted() for channel mock variables in Vitest (factory hoisting)
 - [Phase ?]: ItemsState interface extended with stub subscribeToList/unsubscribe to satisfy TypeScript in Wave 0
+- [Phase 04-04]: useItemsStore.setState() from event handlers for syncStatus (no new store action needed)
+- [Phase 04-04]: handleOnline calls subscribeToList (not bare fetchItems) for full recovery path
 
 ### Pending Todos
 
@@ -95,6 +98,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-05-26T14:23:08.187Z
-Stopped at: Completed 04-01-PLAN.md
+Last session: 2026-05-26T15:34:00Z
+Stopped at: Completed 04-04-PLAN.md
 Resume file: None
