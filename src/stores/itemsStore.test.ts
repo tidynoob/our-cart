@@ -45,11 +45,16 @@ function createMockFrom() {
       return {
         eq: (col: string, val: unknown) => {
           mockEqFn(col, val)
+          // Return an object that is both thenable (for single-eq chains like deleteItem)
+          // and has .eq() for double-eq chains like clearChecked
+          const resolvedPromise = mockDeleteFn._resolvePromise ?? Promise.resolve({ data: null, error: null })
           return {
             eq: (col2: string, val2: unknown) => {
               mockEqFn(col2, val2)
-              return mockDeleteFn._resolvePromise ?? Promise.resolve({ data: null, error: null })
+              return resolvedPromise
             },
+            then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+              resolvedPromise.then(resolve, reject),
           }
         },
       }

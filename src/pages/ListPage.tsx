@@ -103,16 +103,27 @@ export default function ListPage() {
         useItemsStore.getState().fetchItems(list!.id)
       }
     }
+    // SYNC-03: Immediate network-loss detection via browser 'offline' event.
+    // Sets syncStatus to 'reconnecting' without waiting for the 25-50s WebSocket heartbeat timeout.
+    function handleOffline() {
+      useItemsStore.setState({ syncStatus: 'reconnecting' })
+    }
+    // SYNC-03: On network restore, set 'connecting' then re-subscribe (which internally
+    // transitions to 'live' on SUBSCRIBED and fetches items). Replaces the prior bare
+    // fetchItems call — re-subscribing is the full recovery path.
     function handleOnline() {
-      useItemsStore.getState().fetchItems(list!.id)
+      useItemsStore.setState({ syncStatus: 'connecting' })
+      useItemsStore.getState().subscribeToList(list!.id)
     }
 
     document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('offline', handleOffline)
     window.addEventListener('online', handleOnline)
 
     return () => {
       unsubscribe()
       document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('offline', handleOffline)
       window.removeEventListener('online', handleOnline)
     }
   }, [list, subscribeToList, unsubscribe])

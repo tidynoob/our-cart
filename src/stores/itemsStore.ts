@@ -89,9 +89,11 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
     if (error) {
       // Per-item rollback: remove only the optimistic item by its temp ID
       // and surface an error so the UI can notify the user (CR-02).
+      // SYNC-03: If offline, also set syncStatus to 'reconnecting' (belt-and-suspenders).
       set((state) => ({
         items: state.items.filter((i) => i.id !== tempId),
         error: 'Failed to add item',
+        syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
       }))
     } else if (data) {
       // Replace temp item with real DB row (gets the server-generated ID)
@@ -118,9 +120,11 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
     if (error) {
       // Per-item rollback: restore only the single item to its previous state
       // and surface an error so the UI can notify the user (CR-02).
+      // SYNC-03: If offline, also set syncStatus to 'reconnecting' (belt-and-suspenders).
       set((state) => ({
         items: state.items.map((i) => (i.id === id ? prev : i)),
         error: 'Failed to update item',
+        syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
       }))
     }
   },
@@ -142,7 +146,12 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
     if (error) {
       // Per-item rollback: re-insert only the deleted item
       // and surface an error so the UI can notify the user (CR-02).
-      set((state) => ({ items: [...state.items, prev], error: 'Failed to delete item' }))
+      // SYNC-03: If offline, also set syncStatus to 'reconnecting' (belt-and-suspenders).
+      set((state) => ({
+        items: [...state.items, prev],
+        error: 'Failed to delete item',
+        syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
+      }))
     }
   },
 
@@ -167,9 +176,11 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
 
     if (error) {
       // Per-item rollback: restore to prev state and surface error
+      // SYNC-03: If offline, also set syncStatus to 'reconnecting' (belt-and-suspenders).
       set((state) => ({
         items: state.items.map((i) => (i.id === id ? prev : i)),
         error: 'Failed to update item',
+        syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
       }))
     }
   },
@@ -194,12 +205,14 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
     if (error) {
       // Bulk rollback: restore removed items + error in single set() call (CR-02).
       // Dedup against current ids so a concurrent re-insert can't double an item (CR-01).
+      // SYNC-03: If offline, also set syncStatus to 'reconnecting' (belt-and-suspenders).
       set((state) => {
         const present = new Set(state.items.map((i) => i.id))
         const restored = checkedItems.filter((i) => !present.has(i.id))
         return {
           items: [...state.items, ...restored],
           error: 'Failed to clear items',
+          syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
         }
       })
     }
