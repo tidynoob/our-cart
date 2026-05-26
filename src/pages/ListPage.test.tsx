@@ -321,7 +321,7 @@ describe('ListPage — reconnect event handlers', () => {
     expect(mockOrder.mock.calls.length).toBeGreaterThan(initialCallCount)
   })
 
-  it('calls fetchItems on window online event (SYNC-02)', async () => {
+  it('re-subscribes (which internally fetches) on window online event (SYNC-02, SYNC-03)', async () => {
     setupListWithItems([])
     renderAtRoute('ABC12345')
 
@@ -334,15 +334,20 @@ describe('ListPage — reconnect event handlers', () => {
     await act(async () => {
       await new Promise((r) => setTimeout(r, 10))
     })
-    const initialCallCount = mockOrder.mock.calls.length
+    const initialChannelCalls = (supabase.channel as ReturnType<typeof vi.fn>).mock.calls.length
 
-    // Simulate network reconnect
+    // Simulate network reconnect — handleOnline now calls subscribeToList (not bare fetchItems)
     await act(async () => {
       window.dispatchEvent(new Event('online'))
     })
 
-    // fetchItems should have been called at least once more
-    expect(mockOrder.mock.calls.length).toBeGreaterThan(initialCallCount)
+    // Allow async settle for subscribeToList's SUBSCRIBED callback
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10))
+    })
+
+    // subscribeToList should have been called again (creates a new channel)
+    expect((supabase.channel as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(initialChannelCalls)
   })
 })
 
