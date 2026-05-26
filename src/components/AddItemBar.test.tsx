@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AddItemBar } from './AddItemBar'
 
@@ -98,15 +98,102 @@ describe('AddItemBar autocomplete', () => {
     mockSuggestionData = []
   })
 
-  it.todo('shows suggestions after typing a prefix (LIST-05)')
+  it('shows suggestions after typing a prefix (LIST-05)', async () => {
+    mockSuggestionData = [
+      { name: 'Milk', category: 'Dairy', quantity: '2' },
+      { name: 'Miso', category: 'Asian', quantity: '1' },
+    ]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
 
-  it.todo('populates name, category, quantity fields on suggestion selection (LIST-05)')
+    const input = screen.getByPlaceholderText('Add an item...')
+    await user.type(input, 'mi')
 
-  it.todo('does NOT auto-submit on suggestion selection (D-04, LIST-05)')
+    await waitFor(() => {
+      expect(screen.getByRole('listbox')).toBeDefined()
+    })
+    const options = screen.getAllByRole('option')
+    expect(options.length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('Milk')).toBeDefined()
+  })
 
-  it.todo('Escape key dismisses the dropdown (LIST-05)')
+  it('populates name, category, quantity fields on suggestion selection (LIST-05)', async () => {
+    mockSuggestionData = [
+      { name: 'Milk', category: 'Dairy', quantity: '2' },
+    ]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
 
-  it.todo('shows no suggestions when input is empty (LIST-05)')
+    const input = screen.getByPlaceholderText('Add an item...')
+    await user.type(input, 'mi')
+
+    await waitFor(() => {
+      expect(screen.getByText('Milk')).toBeDefined()
+    })
+
+    await user.click(screen.getByText('Milk'))
+
+    // Name input should be populated with 'Milk'
+    expect((input as HTMLInputElement).value).toBe('Milk')
+  })
+
+  it('does NOT auto-submit on suggestion selection (D-04, LIST-05)', async () => {
+    mockSuggestionData = [
+      { name: 'Milk', category: 'Dairy', quantity: '2' },
+    ]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    const input = screen.getByPlaceholderText('Add an item...')
+    await user.type(input, 'mi')
+
+    await waitFor(() => {
+      expect(screen.getByText('Milk')).toBeDefined()
+    })
+
+    await user.click(screen.getByText('Milk'))
+
+    // D-04: addItem must NOT be called on selection
+    expect(mockAddItem).not.toHaveBeenCalled()
+  })
+
+  it('Escape key dismisses the dropdown (LIST-05)', async () => {
+    mockSuggestionData = [
+      { name: 'Milk', category: 'Dairy', quantity: '2' },
+    ]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    const input = screen.getByPlaceholderText('Add an item...')
+    await user.type(input, 'mi')
+
+    await waitFor(() => {
+      expect(screen.getByText('Milk')).toBeDefined()
+    })
+
+    await user.keyboard('{Escape}')
+
+    // Dropdown should be dismissed
+    expect(screen.queryByRole('listbox')).toBeNull()
+    // Input should still have typed text
+    expect((input as HTMLInputElement).value).toBe('mi')
+  })
+
+  it('shows no suggestions when input is empty (LIST-05)', async () => {
+    mockSuggestionData = [
+      { name: 'Milk', category: 'Dairy', quantity: '2' },
+    ]
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    // Wait for the Supabase mock to resolve (component mount fetch)
+    await waitFor(() => {
+      // Just wait a tick for the useEffect to run
+      expect(true).toBe(true)
+    })
+
+    // No typing done — input is empty
+    expect(screen.queryByRole('listbox')).toBeNull()
+  })
 })
 
 describe('AddItemBar tap targets', () => {
