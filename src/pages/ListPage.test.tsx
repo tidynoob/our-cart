@@ -295,6 +295,52 @@ describe('ListPage — reconnect event handlers', () => {
     localStorage.removeItem('our-cart-name-list-id-1')
   })
 
-  it.todo('calls fetchItems when document becomes visible (visibilitychange → visible) (SYNC-02)')
-  it.todo('calls fetchItems on window online event (SYNC-02)')
+  it('calls fetchItems when document becomes visible (visibilitychange → visible) (SYNC-02)', async () => {
+    setupListWithItems([])
+    renderAtRoute('ABC12345')
+
+    // Wait for the list to load and initial subscribeToList/fetchItems to settle
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    // Record fetchItems call count after mount (SUBSCRIBED fires via setTimeout(0))
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10))
+    })
+    const initialCallCount = mockOrder.mock.calls.length
+
+    // Simulate screen wake: visibilityState → visible + dispatch event
+    await act(async () => {
+      Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true })
+      document.dispatchEvent(new Event('visibilitychange'))
+    })
+
+    // fetchItems should have been called at least once more
+    expect(mockOrder.mock.calls.length).toBeGreaterThan(initialCallCount)
+  })
+
+  it('calls fetchItems on window online event (SYNC-02)', async () => {
+    setupListWithItems([])
+    renderAtRoute('ABC12345')
+
+    // Wait for the list to load
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    // Allow SUBSCRIBED callback (setTimeout(0)) to fire
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 10))
+    })
+    const initialCallCount = mockOrder.mock.calls.length
+
+    // Simulate network reconnect
+    await act(async () => {
+      window.dispatchEvent(new Event('online'))
+    })
+
+    // fetchItems should have been called at least once more
+    expect(mockOrder.mock.calls.length).toBeGreaterThan(initialCallCount)
+  })
 })
