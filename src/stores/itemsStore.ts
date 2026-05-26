@@ -273,12 +273,13 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
               return { items: [...state.items, newRow as Item] }
             }
             if (eventType === 'UPDATE') {
-              // Intentional no-op when the id is absent locally (e.g., the row was
-              // optimistically deleted) — map() leaves state unchanged, mirroring the
-              // DELETE branch's defensive handling (WR-03)
+              // WR-03 fix: Early return same reference when no item matches, avoiding
+              // unnecessary re-renders. Mirrors the DELETE branch's defensive pattern.
+              const updatedId = (newRow as Item).id
+              if (!state.items.some((i) => i.id === updatedId)) return state
               return {
                 items: state.items.map((i) =>
-                  i.id === (newRow as Item).id ? (newRow as Item) : i
+                  i.id === updatedId ? (newRow as Item) : i
                 ),
               }
             }
