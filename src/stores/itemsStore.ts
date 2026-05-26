@@ -10,6 +10,11 @@ import type { RealtimeChannel } from '@supabase/supabase-js'
 // must never be skipped just because the prior list's fetch is still settling (CR-01).
 let inFlightListId: string | null = null
 
+// Track pending optimistic temp IDs so the Realtime INSERT echo guard can deduplicate
+// server rows that match a pending optimistic item (by name) — prevents the race where
+// the Realtime INSERT event arrives before the HTTP response replaces the temp ID (CR-01).
+const pendingTempIds = new Set<string>()
+
 interface ItemsState {
   items: Item[]
   loading: boolean
@@ -71,7 +76,8 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       created_at: new Date().toISOString(),
     }
 
-    // Optimistic add — append to items array
+    // Optimistic add — append to items array and track temp ID for dedup (CR-01)
+    pendingTempIds.add(tempId)
     set((state) => ({ items: [...state.items, optimisticItem] }))
 
     const { data, error } = await supabase
@@ -90,6 +96,7 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       // Per-item rollback: remove only the optimistic item by its temp ID
       // and surface an error so the UI can notify the user (CR-02).
       // SYNC-03: If offline, also set syncStatus to 'reconnecting' (belt-and-suspenders).
+      pendingTempIds.delete(tempId)
       set((state) => ({
         items: state.items.filter((i) => i.id !== tempId),
         error: 'Failed to add item',
@@ -97,6 +104,7 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       }))
     } else if (data) {
       // Replace temp item with real DB row (gets the server-generated ID)
+      pendingTempIds.delete(tempId)
       set((state) => ({
         items: state.items.map((i) => (i.id === tempId ? data : i)),
       }))
@@ -245,6 +253,16 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
               // Upsert: no-op if id already present (own-write echo guard — D-03)
               const id = (newRow as Item).id
               if (state.items.some((i) => i.id === id)) return state
+              // CR-01 fix: Check if this server row matches a pending optimistic item.
+              // When Realtime INSERT arrives before the HTTP response, the temp ID is still
+              // in the items array. Match by name to replace the optimistic item in-place.
+              const tempEntry = [...pendingTempIds].find((tid) =>
+                state.items.some((i) => i.id === tid && i.name === (newRow as Item).name)
+              )
+              if (tempEntry) {
+                pendingTempIds.delete(tempEntry)
+                return { items: state.items.map((i) => i.id === tempEntry ? (newRow as Item) : i) }
+              }
               return { items: [...state.items, newRow as Item] }
             }
             if (eventType === 'UPDATE') {
