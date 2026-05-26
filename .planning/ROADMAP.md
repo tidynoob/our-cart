@@ -17,7 +17,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 - [x] **Phase 2: List Management** - Add, edit, delete, and display items (completed 2026-05-25)
 - [x] **Phase 3: Shopping Flow** - Check off, uncheck, and clear completed items (completed 2026-05-25)
 - [x] **Phase 4: Real-Time Sync** - Live updates across both devices (completed 2026-05-26)
-- [ ] **Phase 5: Mobile UX** - Phone-first polish, fast entry, and deployment hardening
+- [x] **Phase 5: Mobile UX** - Phone-first polish, fast entry, and deployment hardening (completed 2026-05-26)
 
 ## Phase Details
 
@@ -163,7 +163,7 @@ Plans:
 
 **Wave 4** *(blocked on Wave 3 completion)*
 
-- [ ] 05-04-PLAN.md — Human verify: final automated checks (build, tsc, vitest), phone walkthrough on real device, Vercel deployment confirmation (UX-01, UX-02, UX-03, LIST-05)
+- [x] 05-04-PLAN.md — Human verify: final automated checks (build, tsc, vitest), phone walkthrough on real device, Vercel deployment confirmation (UX-01, UX-02, UX-03, LIST-05)
 
 **UI hint**: yes
 
@@ -178,7 +178,7 @@ Phases execute in numeric order: 1 → 2 → 3 → 4 → 5
 | 2. List Management | 5/5 | Complete   | 2026-05-25 |
 | 3. Shopping Flow | 2/2 | Complete   | 2026-05-25 |
 | 4. Real-Time Sync | 4/4 | Complete   | 2026-05-26 |
-| 5. Mobile UX | 3/4 | In Progress|  |
+| 5. Mobile UX | 4/4 | Complete   | 2026-05-26 |
 
 ---
 *Roadmap created: 2026-05-24*
