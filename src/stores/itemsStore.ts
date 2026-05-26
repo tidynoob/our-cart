@@ -22,7 +22,7 @@ interface ItemsState {
   syncStatus: 'connecting' | 'live' | 'reconnecting'
   channel: RealtimeChannel | null
 
-  fetchItems: (listId: string) => Promise<void>
+  fetchItems: (listId: string, options?: { background?: boolean }) => Promise<void>
   addItem: (
     listId: string,
     name: string,
@@ -48,8 +48,15 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
   syncStatus: 'connecting',
   channel: null,
 
-  fetchItems: async (listId) => {
-    set({ loading: true, error: null })
+  fetchItems: async (listId, { background = false } = {}) => {
+    // CR-02 fix: background mode skips loading indicator when items already exist,
+    // preventing the list from vanishing during background re-fetches (screen wake,
+    // online recovery, Supabase auto-reconnect).
+    if (!background) {
+      set({ loading: true, error: null })
+    } else {
+      set({ error: null })
+    }
     const { data, error } = await supabase
       .from('items')
       .select('*')
@@ -291,8 +298,11 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
           // Guard keyed by listId so a re-subscribe to a DIFFERENT list is never skipped (CR-01)
           if (inFlightListId !== listId) {
             inFlightListId = listId
+            // CR-02: Use background mode when items are already populated to avoid
+            // clearing the visible list during re-fetches (screen wake, reconnect).
+            const hasItems = get().items.length > 0
             get()
-              .fetchItems(listId)
+              .fetchItems(listId, { background: hasItems })
               .finally(() => {
                 if (inFlightListId === listId) inFlightListId = null
               })
