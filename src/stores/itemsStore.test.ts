@@ -300,6 +300,23 @@ describe('itemsStore — subscribeToList', () => {
     expect(fetchItemsSpy).toHaveBeenCalledWith('list-sync')
   })
 
+  it('re-subscribe to a different list is not skipped while the prior list fetch is in flight (CR-01)', () => {
+    // fetchItems stays pending so the in-flight guard remains set for the first list.
+    // With a boolean guard this would skip list-b; the listId-keyed guard must allow it.
+    const fetchItemsSpy = vi.fn().mockReturnValue(new Promise<void>(() => {}))
+    useItemsStore.setState({ fetchItems: fetchItemsSpy } as Partial<Parameters<typeof useItemsStore.setState>[0]>)
+
+    useItemsStore.getState().subscribeToList('list-a')
+    getCapturedCb()!('SUBSCRIBED')
+    expect(fetchItemsSpy).toHaveBeenCalledWith('list-a')
+
+    // Different list while list-a's fetch is still pending — must NOT be skipped
+    useItemsStore.getState().subscribeToList('list-b')
+    getCapturedCb()!('SUBSCRIBED')
+    expect(fetchItemsSpy).toHaveBeenCalledWith('list-b')
+    expect(fetchItemsSpy).toHaveBeenCalledTimes(2)
+  })
+
   it('sets syncStatus to "reconnecting" on CHANNEL_ERROR (SYNC-03)', () => {
     useItemsStore.getState().subscribeToList('list-sync')
     capturedSubscribeCb = getCapturedCb()

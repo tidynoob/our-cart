@@ -4,9 +4,11 @@ import { supabase } from '@/lib/supabase'
 import type { Item } from '@/types/item'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
-// Module-level in-flight guard: prevents redundant fetchItems calls when
-// visibilitychange + online + SUBSCRIBED fire near-simultaneously (RESEARCH §Resync Guard)
-let fetchInFlight = false
+// In-flight guard keyed by listId: dedupes redundant fetchItems when
+// visibilitychange + online + SUBSCRIBED fire near-simultaneously for the SAME list,
+// while still allowing a fetch for a DIFFERENT list — a re-subscribe to another list
+// must never be skipped just because the prior list's fetch is still settling (CR-01).
+let inFlightListId: string | null = null
 
 interface ItemsState {
   items: Item[]
@@ -204,7 +206,9 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
   },
 
   subscribeToList: (listId: string) => {
-    // Clean up any existing channel before creating a new one (StrictMode double-mount guard — D-09)
+    // Clean up any existing channel before creating a new one (StrictMode double-mount guard — D-09).
+    // removeChannel is fire-and-forget here; a brief overlap with the new channel is safe because
+    // the merge reducer is idempotent by id (a duplicate INSERT/UPDATE/DELETE event is a no-op) (WR-01).
     const existing = get().channel
     if (existing) supabase.removeChannel(existing)
 
@@ -231,6 +235,9 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
               return { items: [...state.items, newRow as Item] }
             }
             if (eventType === 'UPDATE') {
+              // Intentional no-op when the id is absent locally (e.g., the row was
+              // optimistically deleted) — map() leaves state unchanged, mirroring the
+              // DELETE branch's defensive handling (WR-03)
               return {
                 items: state.items.map((i) =>
                   i.id === (newRow as Item).id ? (newRow as Item) : i
@@ -250,11 +257,14 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           set({ syncStatus: 'live' })
-          // fetchInFlight guard: prevents redundant fetches when visibilitychange + online +
-          // SUBSCRIBED all fire simultaneously (RESEARCH §Resync Guard)
-          if (!fetchInFlight) {
-            fetchInFlight = true
-            get().fetchItems(listId).finally(() => { fetchInFlight = false })
+          // Guard keyed by listId so a re-subscribe to a DIFFERENT list is never skipped (CR-01)
+          if (inFlightListId !== listId) {
+            inFlightListId = listId
+            get()
+              .fetchItems(listId)
+              .finally(() => {
+                if (inFlightListId === listId) inFlightListId = null
+              })
           }
         } else {
           // CHANNEL_ERROR, TIMED_OUT, CLOSED all map to reconnecting (D-08)
