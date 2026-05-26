@@ -7,4 +7,8 @@ if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing Supabase environment variables')
 }
 
-export const supabase = createClient(supabaseUrl, supabaseKey)
+export const supabase = createClient(supabaseUrl, supabaseKey, {
+  realtime: {
+    worker: true, // heartbeat via Web Worker — survives browser timer throttling (D-07/SYNC-02)
+  },
+})

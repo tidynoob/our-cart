@@ -4,6 +4,10 @@ import { supabase } from '@/lib/supabase'
 import type { Item } from '@/types/item'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
+// Module-level in-flight guard: prevents redundant fetchItems calls when
+// visibilitychange + online + SUBSCRIBED fire near-simultaneously (RESEARCH §Resync Guard)
+let fetchInFlight = false
+
 interface ItemsState {
   items: Item[]
   loading: boolean
@@ -199,14 +203,74 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
     }
   },
 
-  // Stub: full implementation in Plan 04-02
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  subscribeToList: (_listId: string) => {
-    // No-op stub — implemented in Plan 04-02
+  subscribeToList: (listId: string) => {
+    // Clean up any existing channel before creating a new one (StrictMode double-mount guard — D-09)
+    const existing = get().channel
+    if (existing) supabase.removeChannel(existing)
+
+    set({ syncStatus: 'connecting' })
+
+    const channel = supabase
+      .channel(`items-${listId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'items',
+          filter: `list_id=eq.${listId}`,
+        },
+        (payload) => {
+          // Inline merge reducer — idempotent by id (D-03)
+          const { eventType, new: newRow, old: oldRow } = payload
+          set((state) => {
+            if (eventType === 'INSERT') {
+              // Upsert: no-op if id already present (own-write echo guard — D-03)
+              const id = (newRow as Item).id
+              if (state.items.some((i) => i.id === id)) return state
+              return { items: [...state.items, newRow as Item] }
+            }
+            if (eventType === 'UPDATE') {
+              return {
+                items: state.items.map((i) =>
+                  i.id === (newRow as Item).id ? (newRow as Item) : i
+                ),
+              }
+            }
+            if (eventType === 'DELETE') {
+              // payload.old contains only primary key when RLS is enabled (D-03 / RESEARCH §DELETE Payload)
+              const deletedId = (oldRow as { id?: string }).id
+              if (!deletedId) return state
+              return { items: state.items.filter((i) => i.id !== deletedId) }
+            }
+            return state
+          })
+        }
+      )
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          set({ syncStatus: 'live' })
+          // fetchInFlight guard: prevents redundant fetches when visibilitychange + online +
+          // SUBSCRIBED all fire simultaneously (RESEARCH §Resync Guard)
+          if (!fetchInFlight) {
+            fetchInFlight = true
+            get().fetchItems(listId).finally(() => { fetchInFlight = false })
+          }
+        } else {
+          // CHANNEL_ERROR, TIMED_OUT, CLOSED all map to reconnecting (D-08)
+          set({ syncStatus: 'reconnecting' })
+        }
+      })
+
+    set({ channel })
   },
 
-  // Stub: full implementation in Plan 04-02
   unsubscribe: () => {
-    // No-op stub — implemented in Plan 04-02
+    // Pattern 4: removeChannel deregisters from client registry (prevents duplicate handlers — D-09)
+    const channel = get().channel
+    if (channel) {
+      supabase.removeChannel(channel)
+      set({ channel: null, syncStatus: 'connecting' })
+    }
   },
 }))

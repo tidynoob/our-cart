@@ -279,10 +279,47 @@ describe('itemsStore — subscribeToList', () => {
     capturedSubscribeCb = getCapturedCb()
   })
 
-  it.todo('sets syncStatus to "live" and calls fetchItems when SUBSCRIBED fires (SYNC-02/03)')
-  it.todo('sets syncStatus to "reconnecting" on CHANNEL_ERROR (SYNC-03)')
-  it.todo('sets syncStatus to "reconnecting" on TIMED_OUT (SYNC-03)')
-  it.todo('sets syncStatus to "reconnecting" on CLOSED (SYNC-03)')
+  it('sets syncStatus to "live" and calls fetchItems when SUBSCRIBED fires (SYNC-02/03)', async () => {
+    // Mock fetchItems so we can spy on it without real network calls
+    const fetchItemsSpy = vi.fn().mockResolvedValue(undefined)
+    useItemsStore.setState({ fetchItems: fetchItemsSpy } as Partial<Parameters<typeof useItemsStore.setState>[0]>)
+
+    useItemsStore.getState().subscribeToList('list-sync')
+
+    // Subscribe callback should have been captured by mockChannelSubscribe
+    capturedSubscribeCb = getCapturedCb()
+    expect(capturedSubscribeCb).not.toBeNull()
+
+    // Fire SUBSCRIBED status
+    capturedSubscribeCb!('SUBSCRIBED')
+
+    // syncStatus must be 'live'
+    expect(useItemsStore.getState().syncStatus).toBe('live')
+
+    // fetchItems must have been called with listId
+    expect(fetchItemsSpy).toHaveBeenCalledWith('list-sync')
+  })
+
+  it('sets syncStatus to "reconnecting" on CHANNEL_ERROR (SYNC-03)', () => {
+    useItemsStore.getState().subscribeToList('list-sync')
+    capturedSubscribeCb = getCapturedCb()
+    capturedSubscribeCb!('CHANNEL_ERROR')
+    expect(useItemsStore.getState().syncStatus).toBe('reconnecting')
+  })
+
+  it('sets syncStatus to "reconnecting" on TIMED_OUT (SYNC-03)', () => {
+    useItemsStore.getState().subscribeToList('list-sync')
+    capturedSubscribeCb = getCapturedCb()
+    capturedSubscribeCb!('TIMED_OUT')
+    expect(useItemsStore.getState().syncStatus).toBe('reconnecting')
+  })
+
+  it('sets syncStatus to "reconnecting" on CLOSED (SYNC-03)', () => {
+    useItemsStore.getState().subscribeToList('list-sync')
+    capturedSubscribeCb = getCapturedCb()
+    capturedSubscribeCb!('CLOSED')
+    expect(useItemsStore.getState().syncStatus).toBe('reconnecting')
+  })
 })
 
 describe('itemsStore — unsubscribe', () => {
@@ -299,11 +336,38 @@ describe('itemsStore — unsubscribe', () => {
     capturedSubscribeCb = getCapturedCb()
   })
 
-  it.todo('calls supabase.removeChannel with the active channel ref (SYNC-02)')
-  it.todo('sets channel to null and syncStatus to "connecting" after unsubscribe (SYNC-02)')
+  it('calls supabase.removeChannel with the active channel ref (SYNC-02)', () => {
+    // Subscribe to establish a channel in state
+    useItemsStore.getState().subscribeToList('list-sync')
+    const channelRef = useItemsStore.getState().channel
+    expect(channelRef).not.toBeNull()
+
+    // Unsubscribe — should call removeChannel with the stored channel
+    useItemsStore.getState().unsubscribe()
+    expect(mockRemoveChannel).toHaveBeenCalledWith(channelRef)
+  })
+
+  it('sets channel to null and syncStatus to "connecting" after unsubscribe (SYNC-02)', () => {
+    useItemsStore.getState().subscribeToList('list-sync')
+    expect(useItemsStore.getState().channel).not.toBeNull()
+    expect(useItemsStore.getState().syncStatus).toBe('connecting') // still connecting before SUBSCRIBED fires
+
+    useItemsStore.getState().unsubscribe()
+
+    expect(useItemsStore.getState().channel).toBeNull()
+    expect(useItemsStore.getState().syncStatus).toBe('connecting')
+  })
 })
 
 describe('itemsStore — mergeReducer', () => {
+  // Helper: get the postgres_changes payload callback registered via .on()
+  function getPayloadCallback() {
+    // mockChannelOn.mock.calls[0][2] is the third argument to .on() (the payload handler)
+    const calls = mockChannelOn.mock.calls
+    if (calls.length === 0) throw new Error('subscribeToList must be called before getPayloadCallback')
+    return calls[calls.length - 1][2] as (payload: Record<string, unknown>) => void
+  }
+
   beforeEach(() => {
     vi.clearAllMocks()
     useItemsStore.setState({
@@ -315,12 +379,84 @@ describe('itemsStore — mergeReducer', () => {
     })
     resetCapturedCb()
     capturedSubscribeCb = getCapturedCb()
+    // Set up channel by calling subscribeToList (wires up .on() callback)
+    useItemsStore.getState().subscribeToList('list-sync')
   })
 
-  it.todo('INSERT from partner: appends new item when id is absent (SYNC-01)')
-  it.todo('INSERT echo: no-op when id already exists in items (SYNC-01)')
-  it.todo('UPDATE from partner: replaces matching row by id (SYNC-01)')
-  it.todo('DELETE from partner: removes item by id from payload.old (SYNC-01)')
-  it.todo('DELETE with only id in payload.old: handles partial old object safely (SYNC-01)')
-  it.todo('multiple DELETE events from clearChecked remove correct rows (SYNC-01)')
+  it('INSERT from partner: appends new item when id is absent (SYNC-01)', () => {
+    const payloadCb = getPayloadCallback()
+    const newItem = {
+      id: 'sync-item-3',
+      list_id: 'list-sync',
+      name: 'Carrots',
+      quantity: null,
+      category: null,
+      checked: false,
+      added_by: null,
+      created_at: new Date().toISOString(),
+    }
+
+    payloadCb({ eventType: 'INSERT', new: newItem, old: {} })
+
+    const items = useItemsStore.getState().items
+    expect(items).toHaveLength(3)
+    expect(items.find((i) => i.id === 'sync-item-3')).toBeDefined()
+  })
+
+  it('INSERT echo: no-op when id already exists in items (SYNC-01)', () => {
+    const payloadCb = getPayloadCallback()
+    // Fire INSERT with an id already in the seed state
+    payloadCb({
+      eventType: 'INSERT',
+      new: { ...syncSeedItems[0], name: 'Apples Echo' },
+      old: {},
+    })
+
+    // Items array length must not change
+    const items = useItemsStore.getState().items
+    expect(items).toHaveLength(2)
+    // Original item must be unchanged
+    expect(items.find((i) => i.id === 'sync-item-1')?.name).toBe('Apples')
+  })
+
+  it('UPDATE from partner: replaces matching row by id (SYNC-01)', () => {
+    const payloadCb = getPayloadCallback()
+    const updatedItem = { ...syncSeedItems[0], name: 'Apples (updated)' }
+
+    payloadCb({ eventType: 'UPDATE', new: updatedItem, old: syncSeedItems[0] })
+
+    const items = useItemsStore.getState().items
+    expect(items).toHaveLength(2)
+    expect(items.find((i) => i.id === 'sync-item-1')?.name).toBe('Apples (updated)')
+  })
+
+  it('DELETE from partner: removes item by id from payload.old (SYNC-01)', () => {
+    const payloadCb = getPayloadCallback()
+    // payload.old contains only the primary key (RLS behaviour)
+    payloadCb({ eventType: 'DELETE', new: {}, old: { id: 'sync-item-2' } })
+
+    const items = useItemsStore.getState().items
+    expect(items).toHaveLength(1)
+    expect(items.find((i) => i.id === 'sync-item-2')).toBeUndefined()
+  })
+
+  it('DELETE with only id in payload.old: handles partial old object safely (SYNC-01)', () => {
+    const payloadCb = getPayloadCallback()
+    // Simulate a DELETE where old only has id (RLS strips the rest)
+    payloadCb({ eventType: 'DELETE', new: {}, old: { id: 'sync-item-1' } })
+
+    const items = useItemsStore.getState().items
+    expect(items).toHaveLength(1)
+    expect(items.find((i) => i.id === 'sync-item-1')).toBeUndefined()
+  })
+
+  it('multiple DELETE events from clearChecked remove correct rows (SYNC-01)', () => {
+    const payloadCb = getPayloadCallback()
+    // Simulate two separate DELETE events (as clearChecked would produce)
+    payloadCb({ eventType: 'DELETE', new: {}, old: { id: 'sync-item-1' } })
+    payloadCb({ eventType: 'DELETE', new: {}, old: { id: 'sync-item-2' } })
+
+    const items = useItemsStore.getState().items
+    expect(items).toHaveLength(0)
+  })
 })
