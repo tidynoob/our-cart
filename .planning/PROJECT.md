@@ -28,12 +28,23 @@ Two people can see the same grocery list update in real-time, so nothing gets mi
 
 ### Active
 
-(No active requirements — next milestone not yet planned)
+**Current Milestone: v2.0 Accounts & Multi-List**
+
+**Goal:** Transform from anonymous single-list to authenticated multi-list app with Google sign-in, sidebar navigation, and persistent list management.
+
+**Target features:**
+- Google OAuth sign-in (via Supabase Auth)
+- Editable user profile / display name
+- Multiple lists — create, rename, delete
+- Sidebar navigation — view and switch between all lists
+- List sharing — invite partner to specific lists
+- Auth required — replaces anonymous link-share model
+- Header re-expand — way to bring back dismissed header/code banner
 
 ### Out of Scope
 
-- Multiple lists — one shared list is the core value for v1
-- User accounts/authentication — shared link access only, minimal friction
+- ~~Multiple lists~~ — moved to v2.0 Active scope
+- ~~User accounts/authentication~~ — moved to v2.0 Active scope (Google OAuth)
 - Offline mode/PWA — requires complex sync conflict resolution; internet required
 - Aisle mapping/store layout — categories are simple grouping only
 - Recipe integration — this is a list, not a meal planner
@@ -90,4 +101,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-26 after v1.0 milestone*
+*Last updated: 2026-05-27 after v2.0 milestone start*
