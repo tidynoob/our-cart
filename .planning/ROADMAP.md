@@ -37,7 +37,15 @@
   2. After closing and reopening the browser, user is still signed in without re-authenticating
   3. Visiting any list URL without being signed in redirects to the login page
   4. After completing OAuth redirect, user lands on the correct destination (not a blank callback page)
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+- [ ] 06-01-PLAN.md — OAuth provider config (human) + Wave 0 test scaffolds
+- [ ] 06-02-PLAN.md — authStore TDD implementation (AUTH-01, AUTH-02)
+- [ ] 06-03-PLAN.md — ProtectedRoute TDD + App/router/supabase wiring (AUTH-03)
+- [ ] 06-04-PLAN.md — LandingPage transformation + LoginPage component (AUTH-01)
+- [ ] 06-05-PLAN.md — Database migrations: items.user_id + lists.owner_id + RLS policies
+
 **UI hint**: yes
 
 ### Phase 7: Lists Infrastructure
@@ -94,7 +102,7 @@
 | 3. Shopping Flow | v1.0 | 2/2 | Complete | 2026-05-25 |
 | 4. Real-Time Sync | v1.0 | 4/4 | Complete | 2026-05-26 |
 | 5. Mobile UX | v1.0 | 5/5 | Complete | 2026-05-26 |
-| 6. Auth Foundation | v2.0 | 0/? | Not started | - |
+| 6. Auth Foundation | v2.0 | 0/5 | Not started | - |
 | 7. Lists Infrastructure | v2.0 | 0/? | Not started | - |
 | 8. App Shell & Sidebar | v2.0 | 0/? | Not started | - |
 | 9. Auth Integration into ListPage | v2.0 | 0/? | Not started | - |
@@ -104,3 +112,4 @@
 *Roadmap created: 2026-05-24*
 *v1.0 MVP shipped: 2026-05-26*
 *v2.0 roadmap added: 2026-05-27*
+*Phase 6 planned: 2026-05-27*
