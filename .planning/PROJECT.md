@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A shared grocery list web app for couples. Two people share a single list in real-time — add items, see updates instantly, and check off items as they're bought. Phone-first design, works on desktop too.
+A shared grocery list web app for couples. Two people share a single list in real-time — add items, see updates instantly, and check off items as they're bought. Phone-first design, works on desktop too. Deployed on Vercel with Supabase backend.
 
 ## Core Value
 
@@ -12,34 +12,43 @@ Two people can see the same grocery list update in real-time, so nothing gets mi
 
 ### Validated
 
-(None yet — ship to validate)
+- Real-time shared grocery list between two users — v1.0
+- Add items with name (required), quantity and category (optional) — v1.0
+- Edit and delete existing items — v1.0
+- Items display who added them (color-coded attribution) — v1.0
+- Items auto-sort by category — v1.0
+- Previously added items appear as autocomplete suggestions — v1.0
+- Check off items when bought (stays visible crossed out) — v1.0
+- Clear checked-off items with confirmation dialog — v1.0
+- Share list via URL link — no account creation needed — v1.0
+- Phone-first responsive design with 44px tap targets — v1.0
+- Real-time sync — changes appear within 2 seconds — v1.0
+- Offline detection and automatic reconnection — v1.0
+- Connection status indicator (Live/Reconnecting) — v1.0
 
 ### Active
 
-- [ ] Real-time shared grocery list between two users
-- [ ] Add items with name (required), quantity and category (optional)
-- [ ] Check off items when bought (stays visible crossed out)
-- [ ] Clear checked-off items (removes from both views)
-- [ ] Share list via link or code — no account creation needed
-- [ ] Phone-first responsive design
-- [ ] Instant sync — changes appear within seconds
+(No active requirements — next milestone not yet planned)
 
 ### Out of Scope
 
-- Multiple lists — start with one, revisit later
-- User accounts/authentication — shared link access only
-- Offline mode/PWA — requires internet connection
+- Multiple lists — one shared list is the core value for v1
+- User accounts/authentication — shared link access only, minimal friction
+- Offline mode/PWA — requires complex sync conflict resolution; internet required
 - Aisle mapping/store layout — categories are simple grouping only
 - Recipe integration — this is a list, not a meal planner
+- Push notifications — real-time sync on screen is sufficient
+- Barcode scanning — name + qty sufficient for grocery list
+- Voice assistant integration — high complexity, niche usage
 
 ## Context
 
-- Two-person household use case (Mitch + wife)
-- Primary use: one person plans at home, the other shops at store
-- Phone is the primary device (used while walking store aisles)
-- Needs to be fast and frictionless — competing with a paper list
-- Free-tier cloud hosting (Vercel/Railway/Supabase)
-- No tech stack preference — pick what fits
+Shipped v1.0 MVP in 3 days (2026-05-24 → 2026-05-26).
+Tech stack: React 19 + Vite 8 + Supabase (Postgres + Realtime) + Tailwind v4 + Zustand.
+3,888 LOC TypeScript across 37 source files. 19 plans across 5 phases.
+Hosted on Vercel (free tier) + Supabase (free tier). $0/month operational cost.
+
+Two-person household use case (Mitch + wife). Primary use: one person plans at home, the other shops at store. Phone is primary device.
 
 ## Constraints
 
@@ -52,21 +61,27 @@ Two people can see the same grocery list update in real-time, so nothing gets mi
 
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
-| No auth — shared link access | Two-person private use, minimize friction | — Pending |
-| Real-time sync over polling | Core value depends on instant updates | — Pending |
-| Check-off-then-clear flow | Lets both people see what was bought before clearing | — Pending |
-| Single list for v1 | Keep scope minimal, validate core value first | — Pending |
+| No auth — shared link access | Two-person private use, minimize friction | Good |
+| Real-time sync over polling | Core value depends on instant updates | Good |
+| Check-off-then-clear flow | Lets both people see what was bought before clearing | Good |
+| Single list for v1 | Keep scope minimal, validate core value first | Good |
+| React 19 + Vite 8 + Supabase stack | Free tier covers all needs; React 19 Actions reduce boilerplate | Good |
+| Subscribe-before-fetch for Realtime | Prevents missed events during initial load | Good |
+| Optimistic mutations with per-item rollback | Responsive UX without complex conflict resolution | Good |
+| Belt-and-suspenders offline detection | Window events + mutation error guards cover all network failure modes | Good |
+| nanoid(8) for share codes | URL-friendly, collision-resistant, shorter than UUID | Good |
+| No debounce on autocomplete | O(n) filter on cached small list is imperceptible | Good |
 
 ## Evolution
 
 This document evolves at phase transitions and milestone boundaries.
 
 **After each phase transition** (via `/gsd-transition`):
-1. Requirements invalidated? → Move to Out of Scope with reason
-2. Requirements validated? → Move to Validated with phase reference
-3. New requirements emerged? → Add to Active
-4. Decisions to log? → Add to Key Decisions
-5. "What This Is" still accurate? → Update if drifted
+1. Requirements invalidated? Move to Out of Scope with reason
+2. Requirements validated? Move to Validated with phase reference
+3. New requirements emerged? Add to Active
+4. Decisions to log? Add to Key Decisions
+5. "What This Is" still accurate? Update if drifted
 
 **After each milestone** (via `/gsd-complete-milestone`):
 1. Full review of all sections
@@ -75,4 +90,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-24 after initialization*
+*Last updated: 2026-05-26 after v1.0 milestone*
