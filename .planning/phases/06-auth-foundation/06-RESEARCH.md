@@ -689,17 +689,13 @@ Per [CITED: developers.google.com/identity/branding-guidelines]:
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **Does `items` table currently have any UPDATE or DELETE policies from v1.0?**
-   - What we know: v1.0 Phase 1 SQL only created `anon_select_items` and `anon_insert_items` policies. No UPDATE/DELETE policies were specified.
-   - What's unclear: Were any UPDATE/DELETE policies added later in v1.0 phases (phases 2-5)?
-   - Recommendation: Migration should use `DROP POLICY IF EXISTS` with all plausible names before creating new policies. The planner should grep existing plans for any `CREATE POLICY ... ON items` statements beyond the two in Phase 1.
+   - RESOLVED: Migration uses `DROP POLICY IF EXISTS` with all plausible policy names (anon_select_items, anon_insert_items, anon_update_items, anon_delete_items) before creating replacements. This handles both the known Phase 1 policies and any that may have been added in phases 2-5.
 
 2. **Should `items.user_id` be populated for new items automatically (via DB DEFAULT) or in application code?**
-   - What we know: D-09 says new items created after auth will populate user_id from `auth.uid()`. This can be done in SQL (DEFAULT auth.uid()) or in the addItem action.
-   - What's unclear: The CONTEXT.md doesn't specify SQL DEFAULT vs application-level assignment.
-   - Recommendation: Use SQL `DEFAULT (select auth.uid())` on the column — this ensures user_id is always set by the database even if the application forgets to include it. The application INSERT in `itemsStore.addItem()` can also explicitly pass `user_id: authStore.user?.id` for clarity.
+   - RESOLVED: Use SQL `DEFAULT (select auth.uid())` on the column. Applied in Plan 05 Task 1. Database-level default ensures user_id is always set even if application code omits it.
 
 ---
 
