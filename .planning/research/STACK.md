@@ -1,143 +1,272 @@
-# Technology Stack
+# Stack Research
 
-**Project:** Our Cart — Shared Grocery List
-**Researched:** 2026-05-24
-**Overall Confidence:** HIGH (all major choices verified against official docs and current npm)
+**Domain:** Shared grocery list — v2.0 Accounts & Multi-List additions
+**Researched:** 2026-05-27
+**Confidence:** HIGH (all new additions verified against official Supabase docs and shadcn/ui docs)
 
 ---
 
-## Recommended Stack
+## Unchanged Stack (Do Not Re-Research)
 
-### Core Framework
+The following v1.0 stack is validated and carries forward unchanged:
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| React | 19.2.6 | UI framework | Industry standard, React 19 Actions API reduces boilerplate for mutations like adding/checking items; React 19 compiler eliminates manual memoization |
-| Vite | 8.0.14 | Build tool + dev server | HMR under 50ms, zero-config for SPA, no SSR complexity needed for this app. State of JS 2024 ranks it #1 most-loved build tool |
-| TypeScript | 5.x (bundled with Vite template) | Type safety | Catch bugs at compile time; Vite's react-ts template includes it at no setup cost |
+- React 19.2.6 + Vite 5.4.21 + TypeScript 5.8.3
+- @supabase/supabase-js 2.106.1 (Postgres + Realtime)
+- Zustand 5.0.13 (client UI state)
+- Tailwind CSS 4.3.0 + selective shadcn/ui
+- Vercel hosting + Supabase free tier
+- react-router-dom 7.15.1, nanoid 5.1.11, lucide-react 1.16.0
 
-**Why not Next.js:** This app is a pure SPA — no SEO requirements, no public-facing content pages, no need for SSR or SSG. Next.js adds App Router complexity, React Server Components ceremony, and a deployment dependency on Vercel's serverless infrastructure. Vite + React is the right tool for a client-rendered, real-time collaborative app. The 17% negative sentiment toward Next.js in State of JS 2024 reflects exactly this over-engineering pattern.
+**Note on package.json:** The project is already on Vite 5.4.21 (not 8), per `package.json`. CLAUDE.md references Vite 8 but this appears to be aspirational documentation. The actual installed version is 5.4.21 — use what's installed.
 
-### Backend / Database
+---
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Supabase | @supabase/supabase-js 2.106.1 | Postgres DB + real-time WebSockets | Single free-tier service covers both data persistence (Postgres) and real-time sync (WebSocket broadcast). 200 concurrent connections, 2M messages/month on free tier — absurd headroom for a 2-person app |
+## New Additions for v2.0
 
-**Why Supabase over Firebase:** Supabase uses Postgres (structured, queryable, schemas), is open-source (no vendor lock-in), broadcasts changes in under 50ms latency, and the free tier is commercially usable. Firebase's Realtime Database is NoSQL document-based and removed Cloud Storage from the free Spark plan in February 2026.
+### Authentication: Supabase Auth (No New Package Required)
 
-**Why Supabase over Liveblocks:** Liveblocks is specialized for collaborative editing (cursors, presence). A grocery list does not need cursor tracking or conflict-resolution CRDTs — it needs a list in a database and a WebSocket to push updates. Supabase covers both without the cost or complexity overhead.
+**The `@supabase/supabase-js` SDK already includes full auth support.** No additional auth package is needed.
 
-**Real-time mechanism to use:** Supabase Realtime **Postgres Changes** (not Broadcast). Subscribe to `INSERT`, `UPDATE`, `DELETE` events on the `items` table. This means the database is always authoritative — no manual state reconciliation needed between the two clients. Broadcast (ephemeral peer-to-peer) is for transient events (typing indicators, cursors) that don't need persistence; Postgres Changes is the right primitive for a list where data must survive page refresh.
+The existing `supabase` client in `src/lib/supabase.ts` already has `supabase.auth.*` methods available. Authentication is configured entirely through the Supabase dashboard and env vars.
 
-### State Management
+**What changes in the Supabase client:** None to the package. Add `flowType: 'implicit'` explicitly to auth config to be unambiguous about SPA behavior (implicit flow is the default for browser SPAs; PKCE is for SSR — we are a pure SPA with no server-side code). The Supabase client auto-detects the OAuth callback from the URL hash after Google redirect and persists the session to `localStorage` automatically.
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Zustand | 5.0.13 | Client-side UI state | Manages ephemeral UI state (modal open/closed, optimistic check-off). Tiny bundle (~3KB), no boilerplate, works with React 19. For a 2-user app, global client state is minimal |
-| React built-ins (useState, useReducer) | n/a | Component-local state | Form state, input values — no library needed |
+**Auth API surface used:**
+```typescript
+// Sign in
+supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } })
 
-**Why not TanStack Query:** TanStack Query excels at cache management for REST/GraphQL APIs where you're polling or paginating. With Supabase Realtime pushing changes via WebSocket, the database state flows directly into component state via subscription callbacks — there is no polling layer for TanStack Query to optimize. It would add ~14KB and an abstraction layer for no gain. Use TanStack Query if this ever grows into a multi-list app with complex data fetching.
+// Listen for auth state changes (set up once at app root)
+supabase.auth.onAuthStateChange((event, session) => { /* update Zustand authStore */ })
 
-**Why not Redux:** Redux is for complex state machines across large teams. A grocery list with 2 users has no coordination problem complex enough to justify Redux's boilerplate and mental model overhead.
+// Get current user
+supabase.auth.getUser()
 
-### Styling
+// Get current session
+supabase.auth.getSession()
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Tailwind CSS | 4.3.0 | Utility-first CSS | v4 is CSS-first (no tailwind.config.js), builds are 5x faster than v3, zero-config Vite integration. Mobile-first utilities are ideal for a phone-primary app |
-| shadcn/ui (selective) | latest (CLI-installed) | Pre-built accessible components | Use only for specific components that need accessibility primitives: Dialog, Checkbox, Input. Do NOT import the full library — copy in only what is needed. Built on Radix UI, fully Tailwind v4 and React 19 compatible |
+// Update display name
+supabase.auth.updateUser({ data: { display_name: 'Mitch' } })
 
-**Why not a full component library (MUI, Chakra, Ant Design):** These bring hundreds of components, their own design systems, and heavy bundles. This app needs fewer than 10 UI components. Using a full library would make it harder, not easier, to achieve the "simpler than existing grocery apps" goal.
+// Sign out
+supabase.auth.signOut()
+```
 
-**Why Tailwind v4 over v3:** The CSS-first configuration is a better mental model, the performance improvements are material, and all new projects should start on v4. shadcn/ui's CLI fully supports Tailwind v4 initialization.
+**Google OAuth from user_metadata:** When a user authenticates via Google, Supabase automatically populates `user.user_metadata.full_name` and `user.user_metadata.avatar_url`. Use `full_name` as the initial display name, let users override it. Confirmed behavior from Supabase discussions.
 
-### Infrastructure
+**Session persistence:** Supabase-js handles `localStorage` token storage and auto-refresh automatically. Do NOT use Zustand `persist` middleware for auth tokens — tokens in localStorage via Zustand is redundant and an unnecessary XSS surface. Zustand's `authStore` should hold the user object derived from the session (non-sensitive), not the raw JWT.
 
-| Technology | Version | Purpose | Why |
-|------------|---------|---------|-----|
-| Vercel (Hobby plan) | n/a | Static frontend hosting + CDN | Free, 1M function invocations/month, 100GB bandwidth, global CDN, instant deploys from Git push. Non-commercial personal use is explicitly allowed |
-| Supabase (Free tier) | n/a | Postgres database + Realtime | 500MB database, 5GB egress, 200 concurrent Realtime connections, 2M messages/month. A 2-person grocery list will never approach any of these limits |
+**Supabase dashboard configuration required:**
+1. Enable Google provider in Authentication > Providers
+2. Set Authorized redirect URI in Google Cloud Console: `https://<project>.supabase.co/auth/v1/callback`
+3. Add `http://localhost:5173` and the production domain to Supabase's "Redirect URLs" allowlist
 
-**Free tier math for this project:**
-- Storage: A grocery list with 50 items at ~500 bytes each = 25KB. Supabase limit is 500MB. Headroom: 20,000x.
-- Realtime connections: 2 concurrent users. Limit: 200. Headroom: 100x.
-- Vercel bandwidth: A ~150KB SPA bundle. Limit: 100GB/month. Would require 666,667 full page loads to approach the limit.
+**API key note:** The project currently uses `VITE_SUPABASE_PUBLISHABLE_KEY` (already the new `sb_publishable_*` format). This is correct — the legacy anon key works until end of 2026 but the new key is already in use.
 
-**Free tier risk:** Supabase free projects **pause after 1 week of inactivity**. This is the most likely operational pain point. Mitigation: keep the project active via a scheduled Supabase Edge Function ping (free) or use the free tier "no-pause" workaround by visiting the Supabase dashboard periodically.
+---
 
-### Supporting Libraries
+### New Zustand Store: `authStore`
 
-| Library | Version | Purpose | When to Use |
-|---------|---------|---------|-------------|
-| nanoid | 5.x (latest: 5.1.11) | Generate unique share codes | Create the shareable list ID (e.g., `our-cart.app/list/V1StGXR8`) when a new list is created. URL-friendly, cryptographically secure, 21-char default is collision-resistant |
+Add a new Zustand store (no new package) for auth state. Separate from `uiStore` and `itemsStore` because auth state is global and lifecycle-independent of any list.
+
+```typescript
+// src/stores/authStore.ts
+interface AuthState {
+  user: User | null           // supabase User object (from auth.getUser())
+  loading: boolean            // true while initial session check is in-flight
+  setUser: (user: User | null) => void
+  setLoading: (loading: boolean) => void
+}
+```
+
+Wire it in `App.tsx` or a top-level `AuthProvider` component via `supabase.auth.onAuthStateChange`. This pattern is standard and confirmed in Supabase's React quickstart docs.
+
+**Do NOT use Zustand persist for auth** — the Supabase client already handles token persistence in localStorage. The Zustand store is just a React-friendly view of the current auth state, not a persistence layer.
+
+---
+
+### New shadcn/ui Component: Sheet (Mobile Sidebar Overlay)
+
+**Install:**
+```bash
+npx shadcn@latest add sheet
+```
+
+The `Sheet` component (from shadcn/ui, built on Radix UI Dialog) is the correct primitive for the mobile sidebar. It slides in from the left edge, handles focus trapping, keyboard navigation, and `aria-modal` semantics correctly. This is the standard pattern for mobile navigation drawers in the shadcn ecosystem.
+
+**Why Sheet over the full shadcn Sidebar component:** The shadcn `Sidebar` component is a heavy, opinionated dashboard layout system with `SidebarProvider`, `useSidebar` hook, and complex CSS variable system — it's designed for admin dashboards with persistent sidebars. This app needs a simple slide-in panel on mobile that lists the user's lists. `Sheet` is the right size tool: minimal, composable, already understood by the codebase (Dialog is the same primitive).
+
+**On desktop:** A persistent narrow sidebar or collapsible panel can be built with plain Tailwind utilities (fixed positioning, transform translate). No additional component needed.
+
+**Sheet usage pattern:**
+```tsx
+<Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+  <SheetContent side="left" className="w-72">
+    {/* List of lists, user profile link, create list button */}
+  </SheetContent>
+</Sheet>
+```
+
+---
+
+### No New Router Package Needed
+
+react-router-dom 7.15.1 is already installed. Use nested layout routes with `<Outlet />` for the authenticated shell:
+
+```
+/                    → LandingPage (unauthenticated, shows sign-in)
+/auth/callback       → AuthCallbackPage (handles implicit flow URL hash — may be no-op if Supabase handles automatically)
+/app                 → AuthenticatedLayout (protected, renders sidebar + Outlet)
+  /app/list/:id      → ListPage (per-list view)
+  /app/settings      → SettingsPage (display name, sign out)
+```
+
+`AuthenticatedLayout` checks `authStore.user` — if null, redirects to `/`. If user is present, renders sidebar + `<Outlet />`. This is the standard react-router-dom protected route pattern.
+
+**Route guard implementation:** A simple component that reads from Zustand's `authStore`:
+```tsx
+function RequireAuth({ children }) {
+  const user = useAuthStore(s => s.user)
+  const loading = useAuthStore(s => s.loading)
+  if (loading) return <LoadingScreen />
+  if (!user) return <Navigate to="/" replace />
+  return children
+}
+```
+
+---
+
+### Database Schema Additions (Supabase, no new packages)
+
+**New tables:**
+
+1. **`profiles`** — stores editable display name, references `auth.users`:
+   ```sql
+   create table profiles (
+     id uuid primary key references auth.users on delete cascade,
+     display_name text,
+     updated_at timestamptz default now()
+   );
+   alter table profiles enable row level security;
+   -- Policy: users can only read/write their own row
+   create policy "Users manage own profile"
+     on profiles using ((select auth.uid()) = id);
+   ```
+   Use a trigger to auto-create a profile row on user sign-up (`after insert on auth.users`).
+
+2. **`list_members`** — join table for list ownership/sharing:
+   ```sql
+   create table list_members (
+     list_id uuid references lists on delete cascade,
+     user_id uuid references auth.users on delete cascade,
+     role text default 'member', -- 'owner' | 'member'
+     primary key (list_id, user_id)
+   );
+   alter table list_members enable row level security;
+   ```
+
+3. **`lists` table RLS update** — add policies so authenticated users can only see/modify lists they belong to (via `list_members`):
+   ```sql
+   create policy "Members can view their lists"
+     on lists for select to authenticated
+     using (
+       exists (
+         select 1 from list_members
+         where list_members.list_id = lists.id
+           and list_members.user_id = (select auth.uid())
+       )
+     );
+   ```
+
+4. **`items` table RLS update** — items readable/writable to list members only.
+
+**Sharing mechanism:** When user creates a list, insert into both `lists` and `list_members` (role='owner'). To share, generate a short invite token (nanoid — already in project) stored in a `list_invites` table. Partner visits `/join/:token`, Supabase resolves the list, inserts them into `list_members`. No email required for a 2-person app.
+
+---
+
+### No New State Management Package
+
+Zustand 5.0.13 is already installed. Add an `authStore` (as above) and a `listsStore` for managing multiple lists. The existing `itemsStore` already scopes by `list_id` — that pattern extends naturally.
+
+---
+
+## Recommended New shadcn/ui Components
+
+| Component | Install Command | Use Case |
+|-----------|----------------|----------|
+| Sheet | `npx shadcn@latest add sheet` | Mobile sidebar overlay |
+| Avatar | `npx shadcn@latest add avatar` | User profile picture (from Google `avatar_url`) |
+
+**Avoid installing:** shadcn Sidebar (too heavy for this use case), shadcn NavigationMenu (overkill for a list of 2-5 lists), any form library — existing `useState` patterns are sufficient.
+
+---
+
+## Installation Summary (v2.0 additions only)
+
+```bash
+# No new npm packages needed for auth — supabase-js already includes it
+
+# New shadcn components
+npx shadcn@latest add sheet
+npx shadcn@latest add avatar
+```
+
+**Total new npm dependencies for v2.0: 0.** All capabilities come from packages already installed.
 
 ---
 
 ## Alternatives Considered
 
-| Category | Recommended | Alternative | Why Not |
-|----------|-------------|-------------|---------|
-| Framework | React + Vite | Next.js | SSR/SSG complexity not needed; no SEO requirements; SPA is correct for real-time collab |
-| Real-time | Supabase Realtime | Firebase Realtime DB | Firebase removed free Storage; NoSQL less ergonomic for a structured list; Supabase has lower latency (50ms vs 80ms) |
-| Real-time | Supabase Realtime | Liveblocks | Overkill for a list app; adds cost ceiling; Supabase already covers persistence + sync |
-| Real-time | Supabase Realtime | Ably / Pusher | Both require paid tiers for any sustained usage; Supabase is the only option that bundles database + websockets free |
-| Styling | Tailwind v4 + selective shadcn/ui | MUI / Chakra / Ant Design | Full component libraries are 5-10x heavier; impose design systems at odds with "simpler than existing apps" |
-| State | Zustand | TanStack Query | Query is for server-state cache management; Supabase push model makes polling unnecessary |
-| State | Zustand | Redux Toolkit | 10x the boilerplate for a 2-user app; Zustand covers all needs at ~3KB |
-| Hosting | Vercel | Railway | Railway free tier limited to 500 hours/month execution (compute-based, not static). Static SPA on Vercel is always-on |
-| Hosting | Vercel | Netlify | Both are valid free-tier static hosts; Vercel has better DX for Vite + native CDN performance. Either works |
-| ID generation | nanoid | crypto.randomUUID() | `crypto.randomUUID()` is built-in and fine, but nanoid produces shorter, more URL-friendly codes by default |
+| Recommended | Alternative | Why Not |
+|-------------|-------------|---------|
+| Supabase Auth (built-in) | NextAuth / Auth.js | Requires a server/API route; this is a pure client SPA with no server. Auth.js v5 works with Vite but adds complexity for no gain when Supabase handles OAuth natively |
+| Supabase Auth (built-in) | Clerk | Clerk free tier is generous but adds a third-party dependency and monthly active user limits. Supabase Auth is already bundled and free |
+| Supabase Auth (built-in) | Firebase Auth | Firebase Auth is solid but adding a second backend service creates split infrastructure (Supabase already owns our data) |
+| Sheet (shadcn) | shadcn Sidebar | Sidebar is a full dashboard layout system; Sheet is the correct primitive for a slide-in drawer on mobile |
+| Sheet (shadcn) | Vaul Drawer | Vaul is bottom-sheet focused (swipe-up from bottom); a sidebar comes from the left. Sheet is the right primitive |
+| profiles table | user_metadata only | user_metadata is Supabase-auth-internal and not directly queryable from the public schema with RLS. A `profiles` table is accessible, securable, and joinable |
 
 ---
 
-## Installation
+## What NOT to Add
 
-```bash
-# Scaffold project
-npm create vite@latest our-cart -- --template react-ts
-cd our-cart
-
-# Core dependencies
-npm install @supabase/supabase-js zustand nanoid
-
-# Tailwind v4
-npm install tailwindcss @tailwindcss/vite
-
-# shadcn/ui (CLI-driven, installs components individually)
-npx shadcn@latest init
-# Then add specific components only as needed:
-# npx shadcn@latest add checkbox
-# npx shadcn@latest add dialog
-# npx shadcn@latest add input
-```
+| Avoid | Why | Use Instead |
+|-------|-----|-------------|
+| @supabase/auth-ui-react | Pre-built sign-in form component — too opinionated, hard to style with Tailwind v4, overkill for a single "Sign in with Google" button | A single `<Button onClick={signInWithGoogle}>` in 5 lines of code |
+| @supabase/ssr | SSR helper package for cookie-based sessions — only needed for Next.js/Remix SSR apps | `@supabase/supabase-js` direct (SPA uses implicit flow + localStorage, no cookies) |
+| react-query / TanStack Query | Cache management layer — Supabase Realtime still pushes updates; multi-list doesn't change this | Zustand stores with direct Supabase calls (same pattern as v1) |
+| zustand/persist for auth tokens | localStorage JWT storage via Zustand is a redundant XSS surface; Supabase-js already manages this securely | supabase.auth.getSession() / onAuthStateChange |
 
 ---
 
-## Key Architecture Decisions Driven by Stack Choice
+## Version Compatibility
 
-1. **No backend API layer needed.** Supabase client SDK talks directly to Postgres via the auto-generated REST API (PostgREST) and to Realtime via WebSocket. There is no Node.js/Express server to build or host.
-
-2. **No auth library needed.** The share code (nanoid) embedded in the URL is the access control mechanism. Supabase Row Level Security (RLS) must be configured to allow `anon` role SELECT/INSERT/UPDATE/DELETE on the items table for rows matching the list ID. This is the "public read/write scoped by list ID" RLS pattern — simpler than auth but still protected from cross-list access.
-
-3. **Real-time update flow:** Supabase Postgres Changes subscription fires on INSERT/UPDATE/DELETE -> callback updates Zustand store -> React re-renders affected components. No polling. No manual reconciliation.
-
-4. **Vercel deployment:** `vite build` produces a static `/dist` folder. Vercel serves it from CDN. Zero serverless functions needed for v1 — all logic runs in the browser against Supabase directly.
+| Package | Version | Compatibility Notes |
+|---------|---------|---------------------|
+| @supabase/supabase-js | 2.106.1 (existing) | Auth methods fully supported. Google OAuth via `signInWithOAuth` confirmed working in v2.x |
+| react-router-dom | 7.15.1 (existing) | Nested layout routes with `<Outlet />` confirmed in v7. Protected route pattern is standard |
+| shadcn/ui Sheet | CLI-installed | Based on Radix UI Dialog. Compatible with Tailwind v4 and React 19 (confirmed in shadcn docs) |
+| shadcn/ui Avatar | CLI-installed | Compatible with Tailwind v4 and React 19 |
+| zustand | 5.0.13 (existing) | `create()` API unchanged; add new stores with same pattern |
 
 ---
 
 ## Sources
 
-- Vite 8 release announcement: https://vite.dev/blog/announcing-vite8
-- React 19 versions: https://react.dev/versions
-- Supabase Realtime limits (official docs): https://supabase.com/docs/guides/realtime/pricing
-- Supabase Realtime Broadcast API (official docs): https://supabase.com/docs/guides/realtime/broadcast
-- Supabase free tier limits: https://supabase.com/pricing
-- Vercel Hobby plan (official docs, updated 2026-02-27): https://vercel.com/docs/plans/hobby
-- Tailwind CSS v4.0 announcement: https://tailwindcss.com/blog/tailwindcss-v4
-- shadcn/ui Tailwind v4 support: https://ui.shadcn.com/docs/tailwind-v4
-- nanoid GitHub: https://github.com/ai/nanoid
-- TanStack Query v5: https://tanstack.com/query/latest
-- Supabase free tier pause behavior: https://supabase.com/pricing
-- Supabase RLS securing API: https://supabase.com/docs/guides/api/securing-your-api
-- State of JavaScript 2024 (Vite #1 most-loved build tool): referenced via https://strapi.io/blog/vite-vs-nextjs-2025-developer-framework-comparison
+- Supabase Auth Google OAuth (official docs): https://supabase.com/docs/guides/auth/social-login/auth-google
+- Supabase Auth implicit flow (official docs): https://supabase.com/docs/guides/auth/sessions/implicit-flow
+- Supabase Auth React quickstart (official docs): https://supabase.com/docs/guides/auth/quickstarts/react
+- Supabase RLS (official docs): https://supabase.com/docs/guides/database/postgres/row-level-security
+- Supabase managing user data (official docs): https://supabase.com/docs/guides/auth/managing-user-data
+- Supabase auth updateUser (official docs): https://supabase.com/docs/reference/javascript/auth-updateuser
+- Supabase API key migration (changelog): https://supabase.com/changelog/29260-upcoming-changes-to-supabase-api-keys
+- shadcn/ui Sheet component (official docs): https://ui.shadcn.com/docs/components/radix/sheet
+- shadcn/ui Sidebar component (official docs): https://ui.shadcn.com/docs/components/radix/sidebar
+- React Router v7 protected routes: https://blog.logrocket.com/authentication-react-router-v7/
+- Supabase user_metadata.full_name from Google OAuth: https://github.com/orgs/supabase/discussions/4047
+- Zustand persist security (no JWT in localStorage): https://zustand.docs.pmnd.rs/reference/integrations/persisting-store-data
+
+---
+
+*Stack research for: Our Cart v2.0 — Accounts & Multi-List*
+*Researched: 2026-05-27*

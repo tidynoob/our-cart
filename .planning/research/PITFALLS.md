@@ -1,252 +1,389 @@
-# Domain Pitfalls: Real-Time Shared Grocery List
+# Pitfalls Research
 
-**Domain:** Two-person real-time collaborative list, no-auth shared-link access, phone-first, Supabase free tier
-**Researched:** 2026-05-24
+**Domain:** Adding Google OAuth + multi-list + sharing to existing anonymous single-list app
+**Researched:** 2026-05-27
+**Confidence:** HIGH
+
+> This document covers v2.0 milestone pitfalls only: auth migration, RLS, Google OAuth, multi-list,
+> sidebar navigation, and list sharing. For v1.0 real-time sync pitfalls (WebSocket disconnection,
+> fetch-before-subscribe, free tier pausing, etc.), see git history for the v1.0 version of this file.
 
 ---
 
 ## Critical Pitfalls
 
-Mistakes that cause rewrites, data loss, or the app being unusable in the real scenario it was built for.
-
 ---
 
-### Pitfall 1: Silent WebSocket Disconnection With No Recovery
+### Pitfall 1: Enabling RLS on Existing Tables Locks Out All Existing Data
 
-**What goes wrong:** The WebSocket connection drops — due to a network blip, the phone screen locking, or Safari's aggressive tab throttling — and the frontend has no idea. The person at the store keeps checking off items while the connection is dead. None of those updates propagate. The partner at home sees a stale list. Items get double-bought.
+**What goes wrong:**
+The `items` and `lists` tables currently have no RLS. When you run `ALTER TABLE items ENABLE ROW LEVEL SECURITY` as part of the v2.0 migration, all existing rows immediately become invisible to the anon role — even in queries where no user is authenticated. The app silently returns empty results instead of erroring. The existing list data from v1.0 appears to be gone.
 
-**Why it happens:** WebSocket close events are not always fired by the browser or OS. Mobile Safari is particularly aggressive: it drops WebSocket connections when the screen locks or the user switches apps, without firing a close event that the client can react to. Chrome on Android throttles WebSocket heartbeats in background tabs, which causes the server to consider the client dead while the client still thinks it's connected.
+**Why it happens:**
+PostgreSQL's RLS default is deny-all when no policies exist. Supabase tables with RLS enabled and zero policies return zero rows for all non-superuser roles. The SQL Editor runs as the Postgres superuser and bypasses RLS — so testing in the dashboard will show data, but the client SDK will not. This creates a false sense that everything is fine.
 
-**Consequences:** Silent data loss for the at-store user. Stale list for the at-home user. The core value proposition — "nothing gets missed or double-bought" — is broken.
-
-**Prevention:**
-- Implement explicit connection-state tracking in the UI: "Syncing", "Reconnecting", "Offline".
-- Use Supabase's channel status callbacks (`SUBSCRIBED`, `CHANNEL_ERROR`, `TIMED_OUT`) to detect disconnection and trigger visual feedback immediately.
-- On reconnect, always re-fetch the current list from the database (not just replay realtime events) to fill any gap.
-- Do not rely solely on WebSocket events for updates — on reconnect, issue a full GET of the list state.
+**How to avoid:**
+Write RLS policies in the same migration file as the `ENABLE ROW LEVEL SECURITY` statement — never enable RLS in one step and add policies later. Define policies for the `authenticated` role immediately. During the migration phase, also decide explicitly what to do with orphaned v1.0 data (rows with no `user_id`): either bulk-assign them, archive them, or write a temporary permissive policy to allow transition-period access.
 
 **Warning signs:**
-- No visible sync status indicator in the UI.
-- Tests only performed on desktop Chrome with a stable connection.
-- Reconnect logic not tested by toggling airplane mode on a physical iPhone.
+- Running `ALTER TABLE items ENABLE ROW LEVEL SECURITY` without a following `CREATE POLICY` in the same file.
+- Testing by querying in the Supabase SQL editor and seeing data, then assuming the client will too.
+- No explicit plan for what happens to existing `items` rows that have no `user_id`.
 
-**Phase:** Address in the core real-time sync phase, before any other feature work. This is the most important reliability concern.
-
----
-
-### Pitfall 2: The "Fetch Then Subscribe" Gap (Missing Events on Load)
-
-**What goes wrong:** The app loads, fetches the current list items via a REST query, then subscribes to realtime changes. If another user makes a change in the window between the fetch completing and the subscription activating, that change is silently missed. The UI shows a stale state and will not self-correct until the next change event arrives.
-
-**Why it happens:** There is an inherent race condition between the initial data load (point-in-time snapshot) and the start of the realtime stream. This gap is typically 100-500ms but can be longer on slow mobile connections.
-
-**Consequences:** One user's list shows an item that was already checked off by the other. Confusion, potential double-purchase.
-
-**Prevention:**
-- Subscribe to the realtime channel *before* issuing the initial fetch.
-- Queue any realtime events received during the fetch.
-- After the fetch resolves, merge queued events on top of the fetched snapshot.
-- Alternatively: after the subscription is confirmed `SUBSCRIBED`, perform the initial fetch. Any event that fires during the fetch can be applied idempotently on top.
-
-**Warning signs:** Initial data load and subscription setup happen sequentially (subscribe called in a `.then()` or `await` after the fetch returns).
-
-**Phase:** Core real-time sync phase. Must be designed correctly from the start; retrofitting is messy.
+**Phase to address:** Auth foundation phase (first phase of v2.0). The RLS enablement must happen atomically with policy creation.
 
 ---
 
-### Pitfall 3: Supabase Free Tier Project Pausing (7-Day Inactivity)
+### Pitfall 2: Existing `items` Rows Have No `user_id` — Migration Strategy Is Required
 
-**What goes wrong:** Supabase pauses free tier projects after 7 days of inactivity. If Mitch and his wife go on holiday or simply don't use the app for a week, the next time they open it the database is paused, causing 404s or connection timeouts. If the project stays paused for 90 days, it is permanently deleted.
+**What goes wrong:**
+The current `items` table has `list_id` and `added_by` (a display name string), but no `user_id` foreign key to `auth.users`. When you add `user_id` as a column and enforce it with RLS policies like `(select auth.uid()) = user_id`, all existing rows fail the policy check and become invisible.
 
-**Why it happens:** Supabase free tier resource conservation policy. "Inactivity" means no API calls to the project.
+**Why it happens:**
+v1.0 used anonymous access — there was no concept of a user UUID. Now v2.0 needs ownership. Adding the column is straightforward; migrating the data is not, because there is no mapping from the old `added_by` string to a real `auth.users.id`.
 
-**Consequences:** App appears broken. Manual intervention required (visit Supabase dashboard, click "Resume"). This is fatal to the "frictionless" goal — it's worse than a paper list.
+**How to avoid:**
+Pick one explicit migration strategy before writing any SQL:
+1. **Assign to first owner**: When the first authenticated user claims a list (e.g., by entering a v1.0 share code), bulk-set all existing `items.user_id` for that list to that user's UUID.
+2. **Null means shared**: Make `user_id` nullable and write policies that allow `user_id IS NULL OR user_id = (select auth.uid())`. This lets old rows stay visible while new rows are attributed.
+3. **Archive v1.0 data**: Accept that existing data is unowned, export it as a backup, and start fresh.
 
-**Prevention:**
-- Set up a scheduled GitHub Actions workflow to ping the Supabase health endpoint (`/auth/v1/health` or a lightweight REST query) once every few days.
-- Alternatively, use a cron job on any free scheduler (GitHub Actions free tier is sufficient).
-- This is a known problem with documented solutions: the `supabase-pause-prevention` GitHub repo provides a ready-made workflow.
+For this app (2-person household, single active list), option 2 is the lowest-friction migration.
 
-**Warning signs:** No keep-alive mechanism in place. App only tested during active development (when the project is always active).
+**Warning signs:**
+- Adding `user_id uuid REFERENCES auth.users(id) NOT NULL` to existing tables without a backfill plan.
+- RLS policy uses `user_id = (select auth.uid())` on a table where most rows have NULL `user_id`.
 
-**Phase:** Infrastructure/deployment phase. Must be set up before going "live" as a real app. Takes 15 minutes and prevents a critical failure mode.
-
----
-
-### Pitfall 4: RLS Disabled on Supabase Tables (Any Data Is Public)
-
-**What goes wrong:** Supabase's anon key is intentionally embedded in frontend code and is visible in browser network requests. The anon key alone grants full CRUD access to any table where Row Level Security (RLS) is not enabled. Without RLS, *anyone* who finds the anon key (it's in the JS bundle) can read, modify, or delete the entire grocery list database.
-
-**Why it happens:** Supabase's default for newly created tables is: RLS disabled, with `SELECT/INSERT/UPDATE/DELETE` granted to the `anon` role. This is a developer convenience default, not a production-safe default. Many developers ship without changing it.
-
-**Consequences:** For a private two-person app this is a lower-stakes risk than a multi-tenant app, but it still means any curious person who inspects network requests can wipe all data. It is also the most common Supabase security incident pattern (e.g., Moltbook's 1.5M key exposure in Jan 2026 was RLS-off on a public table).
-
-**Prevention:**
-- Enable RLS on every table from day one, before writing any data.
-- Since there is no authentication (shared link access only), the RLS policy must use the shared list ID (a UUID in the URL) as the access token. A policy like `list_id = current_setting('app.list_id')` enforces row-level scoping per list.
-- Alternatively: keep the database fully server-side (Next.js API routes / server actions only) and never expose the Supabase service key to the client. The frontend talks only to your own API, which performs access checks before touching Supabase.
-- Audit: confirm RLS status in Supabase dashboard > Table Editor > each table's "RLS" badge.
-
-**Warning signs:** Supabase client initialized in frontend code with `createClient(url, anonKey)` and tables have no RLS policies. Network tab shows direct calls to `supabase.co/rest/v1/`.
-
-**Phase:** Data modeling phase (first phase that touches Supabase). RLS policies must be defined before any data is written, not bolted on afterward.
+**Phase to address:** Auth foundation phase. Must be resolved before any RLS policy is written.
 
 ---
 
-## Moderate Pitfalls
+### Pitfall 3: Google OAuth Redirects to `localhost` in Production (or Production in Local Dev)
 
-Mistakes that create pain and user confusion, but don't require a full rewrite.
+**What goes wrong:**
+After Google's OAuth callback, Supabase redirects to the Site URL configured in the Supabase dashboard. If Site URL is set to `http://localhost:5173` (the Vite default), production users land on localhost after sign-in. Conversely, if Site URL is the production URL, local development OAuth callbacks redirect to Vercel and break the local session. Both make OAuth completely non-functional in one environment.
 
----
+**Why it happens:**
+Supabase uses the Site URL as the fallback redirect when no `redirectTo` is passed to `signInWithOAuth()`. The Supabase dashboard has a single Site URL field. Vercel preview deployments add a third URL to the matrix: the preview deployment URL (`*.vercel.app`) is neither localhost nor the production domain, but OAuth redirects need to work there too.
 
-### Pitfall 5: No Visual Sync Status = Users Don't Know What's Real
+**How to avoid:**
+In Supabase Dashboard → Auth → URL Configuration:
+- Set **Site URL** to the production domain: `https://our-cart.app` (or whatever the Vercel production URL is).
+- Add to **Redirect URLs allowlist** (with wildcard `**` suffix for multi-level path support):
+  - `http://localhost:5173/**`
+  - `https://*-mitchellgriffin.vercel.app/**` (adjust for the actual Vercel account slug)
+  - The production domain: `https://our-cart.app/**`
 
-**What goes wrong:** The app shows no indication of its connection state. When the WebSocket drops (see Pitfall 1), both users just see whatever the last state was, with no way to know if it's current. The at-store user taps "Add milk" and nothing happens. They tap again. They don't know if it worked.
+In the app code, always pass an explicit `redirectTo` when calling `signInWithOAuth()`, computed from `window.location.origin`, so it adapts to whichever environment is running.
 
-**Why it happens:** Developers test on local networks and fast connections where latency is invisible. The phone-in-a-grocery-store scenario has patchy WiFi, 4G handoffs, and a locked screen between aisles.
+In Google Cloud Console → OAuth Client → Authorized redirect URIs, add the Supabase callback URL for the project: `https://<project-id>.supabase.co/auth/v1/callback`. Authorized JavaScript origins should include both `http://localhost:5173` and the production domain.
 
-**Prevention:**
-- Always show a sync status indicator: a subtle colored dot or banner ("Live", "Reconnecting...").
-- Implement optimistic UI for add/check-off actions: apply the change instantly in local state, then confirm (or roll back) when the database responds.
-- On reconnect, show "Synced" briefly so the user knows the connection is restored.
+**Warning signs:**
+- `signInWithOAuth({ provider: 'google' })` called without a `redirectTo` parameter.
+- Supabase Site URL is still `http://localhost:5173`.
+- Google Cloud Console only has one Authorized redirect URI (either localhost or production, not both).
+- OAuth works in one environment but fails in the other.
 
-**Warning signs:** No connection status UI. No loading/pending state on mutations.
-
-**Phase:** Core UI phase. Design the sync indicator as a first-class UI component, not a late addition.
-
----
-
-### Pitfall 6: Touch Targets Too Small for In-Store Use (Gloved Hands, One Thumb)
-
-**What goes wrong:** The check-off interaction — the single most frequent action in the app — has a small checkbox or tap target. In a grocery store, the user is holding the phone in one hand, possibly wearing gloves, with the list jostling as they push a cart. Small targets cause mis-taps: accidentally checking items that haven't been bought, or failing to check items that have.
-
-**Why it happens:** Developers test by clicking with a mouse cursor or tapping carefully on a resting phone. Real grocery use is one-handed and distracted.
-
-**Consequences:** The app becomes more frustrating than a paper list. The core use case fails.
-
-**Prevention:**
-- Minimum touch target: 44x44px (Apple HIG) / 48x48dp (Material), with adequate spacing between targets.
-- The entire list item row should be the tap target for check-off, not just a checkbox widget.
-- Test on a physical device, one-handed, while walking.
-- Place the primary action (check-off) on the dominant-hand side (right edge for most users) or make it the full row.
-
-**Warning signs:** Checkbox is implemented as a small `<input type="checkbox">` with default browser sizing. Delete button is adjacent to the check-off target with no spacing buffer.
-
-**Phase:** UI/component phase. Define touch target rules before building list item components.
+**Phase to address:** Auth foundation phase — must be configured before the first OAuth test.
 
 ---
 
-### Pitfall 7: "Clear Checked Items" Deletes Without Confirmation, Surprising the Partner
+### Pitfall 4: Auth State Flash on Page Load (Unauthenticated UI Shown Before Session Resolves)
 
-**What goes wrong:** One user taps "Clear completed" to clean up the list after shopping. The other user, who may still be at the store and hasn't seen the items get cleared, suddenly sees the list wipe. There's no undo. If the list had items they hadn't noticed were checked (checked by mistake), they're now gone.
+**What goes wrong:**
+On page load, `supabase.auth.getSession()` is asynchronous. Before the session resolves, protected routes render as if the user is unauthenticated. The user sees the sign-in page (or a redirect flash) for 200–500ms before being shown the authenticated view. On mobile, this is visually jarring. In React Router, if the redirect fires before `onAuthStateChange` emits `INITIAL_SESSION`, the user is bounced to `/login` and then immediately back to the list — a double navigation.
 
-**Why it happens:** Clear-all is implemented as a single-tap destructive action with no confirmation. In a single-user app, this is acceptable. In a two-user real-time app, destructive shared actions need more friction.
+**Why it happens:**
+`supabase.auth.onAuthStateChange` fires the `INITIAL_SESSION` event after the async session check completes. React Router evaluates route guards synchronously on render. If the auth context has not resolved yet, the guard sees `user: null` and redirects to login — then the session resolves, updates the context, and triggers a second navigation back.
 
-**Prevention:**
-- Require a confirmation step for "Clear completed" (e.g., a bottom sheet "Remove 5 checked items?").
-- Show a brief "undo" window (5-10 seconds) after clearing, implemented as a soft-delete (mark `deleted_at`, filter from queries, purge after timeout).
-- The check-off-then-clear flow identified in PROJECT.md is correct; the risk is in the "clear" step being too easy to trigger accidentally.
+**How to avoid:**
+Introduce an `isLoading` state in the auth context that starts `true` and becomes `false` only after `INITIAL_SESSION` fires. Protected routes must render `null` or a spinner (not a redirect) while `isLoading` is true. The guard logic is: `if (isLoading) return <Spinner />`, then `if (!user) return <Navigate to="/login" />`.
 
-**Warning signs:** "Clear" is a single-tap button with no confirmation. Deletion is hard-delete (immediate `DELETE FROM items`).
+```tsx
+// AuthContext pattern
+const [session, setSession] = useState<Session | null>(null)
+const [loading, setLoading] = useState(true)
 
-**Phase:** Core features phase, when implementing the check-off/clear flow.
+useEffect(() => {
+  const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    (_event, session) => {
+      setSession(session)
+      setLoading(false)
+    }
+  )
+  return () => subscription.unsubscribe()
+}, [])
+```
 
----
+Do NOT make the `onAuthStateChange` callback async — it causes deadlock in the token refresh mechanism when `TOKEN_REFRESHED` events are processed.
 
-### Pitfall 8: URL-Based Access Means Anyone With the Link Has Full Write Access
+**Warning signs:**
+- `onAuthStateChange` callback is marked `async`.
+- Protected route guard has no loading state — it checks `user === null` and redirects immediately.
+- Users report a brief flash of the login screen before landing on the list.
 
-**What goes wrong:** The shared link (`/list/abc123`) is the only access control. If the link leaks — sent over SMS, stored in browser history, or scanned in a screenshot — anyone who has it can add, check off, or clear items. More practically: the link could end up in a messaging app's link preview cache or a browser sync.
-
-**Why it happens:** No-auth shared link is deliberately chosen for frictionlessness. The risk is the trade-off.
-
-**Prevention:**
-- Use a UUID v4 (or CUID2) for the list ID — 122 bits of randomness makes brute-force impossible.
-- Do not use sequential IDs or short codes for the list identifier.
-- Accept that for a private two-person app, this level of obscurity is sufficient (this is the same model OurList uses by design).
-- Document this explicitly so the decision is not re-litigated: "We are not defending missile silos."
-- Optionally: add a simple PIN or 4-digit code as a secondary check if the couple wants it later, but do not block launch on this.
-
-**Warning signs:** List IDs are sequential integers (`/list/42`), short strings, or predictable patterns.
-
-**Phase:** Data modeling phase. The list ID format must be decided before any data is written or links are generated.
-
----
-
-## Minor Pitfalls
-
-Low-severity issues that create friction but don't break the app.
+**Phase to address:** Auth foundation phase — the AuthContext is the first thing built.
 
 ---
 
-### Pitfall 9: Implementing the Wrong Supabase Realtime Mode
+### Pitfall 5: RLS Policies Written Without `WITH CHECK` on INSERT/UPDATE
 
-**What goes wrong:** Using Supabase Postgres Changes (database-level WAL streaming) for every interaction, including high-frequency ones. For a two-person grocery app this is fine at low volume, but using `Broadcast` mode for ephemeral signals (e.g., "user is typing" or presence indicators) unnecessarily writes to the database and consumes WAL throughput.
+**What goes wrong:**
+A `USING` clause on a SELECT/UPDATE policy controls which rows a user can *read*. The `WITH CHECK` clause on INSERT/UPDATE controls what a user can *write*. Without `WITH CHECK` on INSERT, an authenticated user can insert a row with any arbitrary `user_id` (including another user's UUID). Without `WITH CHECK` on UPDATE, a user can change the `user_id` on a row they own, effectively stealing ownership.
 
-**Prevention:**
-- Use `Postgres Changes` for item adds, check-offs, and deletes — these need persistence.
-- Use `Broadcast` for any ephemeral signals that don't need to be stored.
-- For this app's scale (2 users, occasional updates), either mode works; just don't write ephemeral state to the database.
+**Why it happens:**
+Developers think in terms of "what can the user see" (SELECT), not "what can the user write". RLS documentation examples often focus on SELECT. The Supabase dashboard's Policy editor sometimes auto-generates USING clauses without WITH CHECK.
 
-**Phase:** Core real-time sync phase.
+**How to avoid:**
+Every INSERT policy needs `WITH CHECK ((select auth.uid()) = user_id)`. Every UPDATE policy needs both `USING ((select auth.uid()) = user_id)` and `WITH CHECK ((select auth.uid()) = user_id)`.
+
+Additionally: a SELECT policy is required on a table before UPDATE will work at all. If UPDATE isn't working, check for a missing SELECT policy first.
+
+Example for `items` table:
+```sql
+-- SELECT: users see items in lists they belong to
+CREATE POLICY "items_select" ON items
+  FOR SELECT USING (
+    list_id IN (SELECT list_id FROM list_members WHERE user_id = (select auth.uid()))
+  );
+
+-- INSERT: users can only insert items with their own user_id
+CREATE POLICY "items_insert" ON items
+  FOR INSERT WITH CHECK (
+    (select auth.uid()) = user_id AND
+    list_id IN (SELECT list_id FROM list_members WHERE user_id = (select auth.uid()))
+  );
+
+-- UPDATE: users can only update their own items
+CREATE POLICY "items_update" ON items
+  FOR UPDATE
+  USING ((select auth.uid()) = user_id)
+  WITH CHECK ((select auth.uid()) = user_id);
+```
+
+**Warning signs:**
+- Policies use `USING` but no `WITH CHECK`.
+- Testing only checks that SELECT returns the right rows, not that INSERT rejects bad user_id values.
+
+**Phase to address:** Auth foundation phase — write policies correctly from the start.
 
 ---
 
-### Pitfall 10: Over-Engineering the Data Model Before Validating Core Value
+### Pitfall 6: Using `auth.uid()` Directly in RLS Policies (Performance Trap)
 
-**What goes wrong:** Developer adds categories, quantities, sort orders, per-item metadata, and multi-list support before the basic add/check-off/sync loop is proven to work reliably. The schema becomes complex, migrations pile up, and the UI is cluttered before anyone has confirmed the core value is real.
+**What goes wrong:**
+RLS policies with `auth.uid() = user_id` (unwrapped) force PostgreSQL to evaluate `auth.uid()` for every row scanned, rather than once per query. On the `items` table at even moderate size, this causes sequential scans instead of index seeks. The pattern `(select auth.uid()) = user_id` tells the Postgres query planner to treat it as a constant per query (initPlan), enabling index use.
 
-**Why it happens:** Developers know what features could exist and build toward the imagined product instead of the validated one. PROJECT.md already has several items explicitly out of scope — this pitfall is about violating that discipline.
+**Why it happens:**
+The unwrapped form looks identical and works correctly — it's just slow. Performance degradation is invisible until the table has significant rows, which won't happen during development.
 
-**Prevention:**
-- Ship Phase 1 as: item name only, check-off, clear, real-time sync. Nothing else.
-- Add quantity and category only after the core loop is confirmed working reliably on real phones in a real store.
-- Keep the database schema minimal: `id`, `list_id`, `name`, `checked`, `created_at`. Add columns in later phases.
+**How to avoid:**
+Always write `(select auth.uid())` not `auth.uid()` in policy expressions. Also create indexes on every column referenced in policies: `CREATE INDEX ON items(list_id)`, `CREATE INDEX ON items(user_id)`, `CREATE INDEX ON list_members(user_id, list_id)`.
 
-**Warning signs:** Schema includes `quantity`, `category`, `sort_order`, `aisle`, `unit` before Phase 1 is deployed and tested.
+Supabase's Performance Advisor in the dashboard flags unindexed RLS columns — run it after writing policies.
 
-**Phase:** All phases. Enforce scope discipline at each phase boundary.
+**Warning signs:**
+- Policy body contains `auth.uid()` not `(select auth.uid())`.
+- No explicit index on `user_id` or `list_id` in the items/lists tables.
+- Supabase Performance Advisor shows "RLS policy references unindexed column" warnings.
 
----
-
-### Pitfall 11: Empty State After "Clear" Feels Broken
-
-**What goes wrong:** After clearing checked items (or before any items are added), the list shows a blank screen. New users — or users returning after a clear — don't understand whether the app is loaded, whether sync is working, or whether something went wrong.
-
-**Prevention:**
-- Design an explicit empty state: "Your list is empty. Add the first item below."
-- The empty state should be visually distinct from a loading state and a disconnected state.
-- A just-cleared list should briefly show a "List cleared" confirmation before rendering the empty state.
-
-**Phase:** UI/component phase.
+**Phase to address:** Auth foundation phase when writing policies. Can be retrofitted but better to get right initially.
 
 ---
 
-## Phase-Specific Warnings
+### Pitfall 7: Realtime Channel Does Not Inherit Auth Session Automatically After Login
 
-| Phase Topic | Likely Pitfall | Mitigation |
-|---|---|---|
-| Database setup | RLS disabled by default on new tables | Enable RLS and write policies before any other work |
-| Data modeling | Sequential or short list IDs | Use UUID v4 / CUID2 from the start |
-| Real-time sync setup | Fetch-then-subscribe gap | Subscribe before fetching; merge queued events |
-| Real-time sync setup | Silent disconnection | Implement connection status tracking on day one |
-| Core UI components | Small touch targets for check-off | Full-row tap target, minimum 44px height |
-| Core features (check-off/clear) | Destructive clear without confirmation | Confirmation step + soft-delete with undo window |
-| Deployment | Supabase project pauses after 7 days | Set up keep-alive cron job before launch |
-| All phases | Over-engineering beyond validated scope | Enforce PROJECT.md out-of-scope list at every phase |
+**What goes wrong:**
+The existing `itemsStore.ts` creates a Supabase Realtime channel using the global `supabase` client. In v1.0, the channel used the anon role (no auth). In v2.0 with RLS on, the channel needs to authenticate with the user's JWT. If the channel is created before the user signs in, or if the JWT expires and the channel is not refreshed, the Realtime connection silently drops to zero rows (RLS blocks all events).
+
+Specifically: Realtime caches the access policy for the duration of the channel connection. If the user logs in after the channel is opened, the channel will continue operating under the unauthenticated context until it is explicitly refreshed or the channel is recreated.
+
+**Why it happens:**
+The `supabase` client automatically manages auth tokens for REST calls (it re-reads the session for each HTTP request). Realtime is different: the JWT is passed once at connection time, and policy changes (including login) only take effect when the client sends a new JWT via `realtime.setAuth()` or reconnects.
+
+**How to avoid:**
+- Listen to `onAuthStateChange` and call `supabase.realtime.setAuth(session.access_token)` whenever the session changes (login, token refresh, logout).
+- When the user logs out, call `supabase.realtime.setAuth(null)` to drop back to anon.
+- In `itemsStore.subscribeToList`, always call `unsubscribe()` and recreate the channel after an auth state change, not just on list navigation.
+
+**Warning signs:**
+- Realtime subscription is opened before the auth session is confirmed.
+- `onAuthStateChange` does not trigger a channel refresh or `setAuth` call.
+- Items stop appearing after the JWT access token expires (default: 1 hour).
+
+**Phase to address:** Auth foundation phase — must be part of the AuthContext design, not patched later.
+
+---
+
+### Pitfall 8: List Sharing RLS Allows Invitation Table to Be Read by Anyone
+
+**What goes wrong:**
+List sharing requires an invitation mechanism: a share code or link that lets a second user join a list. The `list_invitations` table needs to be readable by unauthenticated (or not-yet-joined) users to process the invite. If RLS is written naively as `SELECT ... WHERE user_id = (select auth.uid())`, the invited user cannot read their invitation (they don't yet have `user_id` set on the row). If RLS is disabled entirely on the invitations table, all invitations are publicly readable.
+
+**Why it happens:**
+This is a documented pattern specific to Supabase invitation systems. The invitation exists before the user accepts it, so the user ID is not yet known. Developers either open the table (security hole) or lock it completely (invitation flow breaks).
+
+**How to avoid:**
+Use a `SECURITY DEFINER` function to expose invitation data by token only — the function accepts the invite token and returns the matching invitation row, bypassing RLS in a controlled way because only the specific row matching the token is returned. UUID tokens are non-guessable, so single-record exposure is safe.
+
+```sql
+CREATE OR REPLACE FUNCTION get_invitation(invite_token uuid)
+RETURNS list_invitations
+LANGUAGE sql
+SECURITY DEFINER
+AS $$
+  SELECT * FROM list_invitations WHERE token = invite_token LIMIT 1;
+$$;
+```
+
+For the `list_members` table (which grants ongoing access), a standard RLS policy based on `user_id` is correct and safe.
+
+**Warning signs:**
+- `list_invitations` table has `SELECT TO authenticated USING (true)` or no RLS at all.
+- Invitation flow assumes the invited user is already in `auth.users` before they click the link.
+
+**Phase to address:** List sharing phase. The invitation schema must use this pattern from the start.
+
+---
+
+### Pitfall 9: `getSession()` Used for Authorization Decisions Instead of `getUser()`
+
+**What goes wrong:**
+`supabase.auth.getSession()` reads the JWT from localStorage without making a network call and without verifying the token's authenticity. A tampered or stolen token would pass `getSession()`. For display-only purposes (rendering the user's name) this is fine. For authorization decisions (is this user allowed to delete this list?), it is a security vulnerability.
+
+**Why it happens:**
+`getSession()` is faster (no network call) and simpler. Developers use it everywhere because it works 99% of the time. The distinction from `getUser()` is subtle and not obvious from the function name.
+
+**How to avoid:**
+Use `getUser()` for any check that gates access to data or a destructive action. Use `getSession()` only for non-critical UI state (display name, avatar). For this SPA, the pattern is: `onAuthStateChange` provides the session for UI rendering; `getUser()` is called when an action touches the database (though RLS on the Supabase side is the real security layer — `getUser()` is defense in depth on the client).
+
+**Warning signs:**
+- Every auth check in the app uses `getSession()`, including ones that gate navigation or mutations.
+- No use of `getUser()` anywhere in the codebase.
+
+**Phase to address:** Auth foundation phase — establish the pattern in the AuthContext before any feature work.
+
+---
+
+## Technical Debt Patterns
+
+| Shortcut | Immediate Benefit | Long-term Cost | When Acceptable |
+|----------|-------------------|----------------|-----------------|
+| Null `user_id` on old items instead of backfill | No data migration needed | Items visible to all list members regardless of who added them (correct for this use case, actually) | Acceptable — v1.0 items are shared household data |
+| Storing display name in `user_metadata` instead of a separate `profiles` table | Simpler schema | `user_metadata` can be updated by the user directly; not suitable for authorization, and hard to join | Only for initial draft; move to `profiles` table before shipping |
+| Single `supabase` client instance in `lib/supabase.ts` | Simple, no change needed | Token state is global — if multiple tabs have different auth states, all share one session | Acceptable for a 2-person app where concurrent sessions are rare |
+| Hardcoded redirect URL in `signInWithOAuth()` | Quicker to write | Breaks in preview deployments or if the domain changes | Never — always use `window.location.origin` |
+| Skipping the `profiles` table and storing name in `auth.users.user_metadata` | One less table | user_metadata is user-writable and cannot be secured with RLS | Never for any data used in authorization |
+
+---
+
+## Integration Gotchas
+
+| Integration | Common Mistake | Correct Approach |
+|-------------|----------------|------------------|
+| Supabase Auth + Google OAuth | Not configuring Authorized JavaScript Origins in Google Cloud Console separately from Redirect URIs | Both must be set: Origins = app domain, Redirect URI = `<project>.supabase.co/auth/v1/callback` |
+| Supabase Realtime + Auth | Opening channel before user is authenticated, then wondering why RLS blocks events | Open channel after `INITIAL_SESSION` fires; call `realtime.setAuth()` on each auth state change |
+| Supabase RLS + Postgres Changes | RLS blocks DELETE payloads from including full row data — `payload.old` only has primary key when RLS is enabled | The existing `itemsStore.ts` already handles this correctly: `(oldRow as { id?: string }).id` — preserve this pattern |
+| Vercel + Supabase OAuth | Preview deployment URLs (`*.vercel.app`) not in Supabase redirect allowlist | Add wildcard pattern `https://*-<account-slug>.vercel.app/**` to Supabase allowed redirect URLs |
+| Supabase Auth + `onAuthStateChange` | Making the callback `async` | Remove all async calls from the callback; it causes deadlock during token refresh |
+| Google Cloud Console + OAuth | Adding restricted scopes (anything beyond email + profile + openid) | Only request `email`, `profile`, `openid` — restricted scopes trigger a Google verification process that takes weeks |
+
+---
+
+## Performance Traps
+
+| Trap | Symptoms | Prevention | When It Breaks |
+|------|----------|------------|----------------|
+| `auth.uid()` unwrapped in RLS policies | Queries slow as items table grows | Use `(select auth.uid())` always | Noticeable at ~10K rows; invisible during development |
+| Subquery in RLS SELECT policy not indexed | List membership check is a sequential scan on `list_members` | Index `list_members(user_id)` and `list_members(list_id)` | At 10+ lists per user |
+| Fetching all lists for sidebar then filtering client-side | Extra data transferred; slow initial load | Use RLS + server-side filter: `SELECT * FROM lists WHERE id IN (SELECT list_id FROM list_members WHERE user_id = auth.uid())` | Negligible for 2-person app, but wrong pattern |
+| Re-creating Realtime channel on every auth state change event | Excessive reconnections if auth state changes rapidly | Debounce or gate channel recreation: only recreate if `user.id` actually changed | Any rapid sign-in/sign-out cycle |
+
+---
+
+## Security Mistakes
+
+| Mistake | Risk | Prevention |
+|---------|------|------------|
+| Storing sensitive data in `user_metadata` (user-writable) | User can self-escalate permissions by editing metadata if any RLS policy reads from it | Store role/permission data only in `app_metadata` (server-writable) or a separate `profiles` table with RLS |
+| Exposing invite tokens in URL query params that get logged by analytics | Invite links can be replayed by anyone who sees the logs | Use short-lived invite tokens; expire after 24 hours or first use |
+| Not enabling RLS on the `profiles` table | Any authenticated user can read/write any user's profile | Enable RLS on `profiles` with `(select auth.uid()) = id` for all operations |
+| Using the Supabase service role key in client code | Full database bypass — any user gets superuser access | Service role key never in frontend; anon key only in client |
+| Allowing any authenticated user to join any list by knowing the list UUID | No isolation between users' lists | List membership must be explicit: user must be in `list_members` to access a list |
+
+---
+
+## UX Pitfalls
+
+| Pitfall | User Impact | Better Approach |
+|---------|-------------|-----------------|
+| Requiring sign-in before explaining what the app does | Bounce rate on landing page; users don't understand why they need an account | Show value (screenshot/description) on landing page; sign-in is secondary |
+| Google OAuth popup blocked by mobile Safari | Users see nothing happen after tapping "Sign in with Google" | Use redirect flow (`redirectTo`) instead of popup on mobile; Supabase defaults to this |
+| After sign-in, user lands on home page instead of the list they came from | Disorienting; breaks invite flow (user clicked an invite link, got bounced to login, now can't find the list) | Store `returnTo` URL before redirecting to login; restore after OAuth callback |
+| Sidebar opening on every list navigation (no persistence) | Sidebar state resets constantly; feels broken on mobile | Persist sidebar open/closed state in localStorage; remember it across page loads |
+| Sign-out without confirmation | Partner accidentally signs out while shopping | Require confirmation for sign-out; recovering requires phone + Google auth again |
+
+---
+
+## "Looks Done But Isn't" Checklist
+
+- [ ] **RLS enabled**: Verify in Supabase dashboard that ALL tables (items, lists, list_members, profiles, list_invitations) show "RLS enabled". The SQL Editor won't reveal missing policies.
+- [ ] **OAuth redirect working in all environments**: Test sign-in on localhost, on a Vercel preview URL, and on the production domain. All three must complete without redirect errors.
+- [ ] **INSERT WITH CHECK present**: Verify that INSERT policies have a `WITH CHECK` clause — not just `USING`. Missing this allows any user to insert rows with arbitrary `user_id`.
+- [ ] **Existing v1.0 data visible**: After migration, verify that items created in v1.0 (no `user_id`) are still visible to the authenticated user who claimed the list.
+- [ ] **Token refresh doesn't break Realtime**: Let a session run for >1 hour, then confirm Realtime is still receiving events. `onAuthStateChange` with `TOKEN_REFRESHED` must call `realtime.setAuth()`.
+- [ ] **Sidebar shows correct lists**: After switching users (sign out, sign in as other user), sidebar must show only the new user's lists — not a mix of both users' data from cache.
+- [ ] **`(select auth.uid())` not `auth.uid()`**: Grep all migration SQL files for bare `auth.uid()` in USING/WITH CHECK clauses. Replace with wrapped form.
+- [ ] **Invitation flow tested with brand-new account**: An invite link must work for a user who has never opened the app before — not just for an existing user.
+
+---
+
+## Recovery Strategies
+
+| Pitfall | Recovery Cost | Recovery Steps |
+|---------|---------------|----------------|
+| RLS enabled without policies (data locked out) | LOW | In Supabase SQL editor: `CREATE POLICY "temp_open" ON items FOR ALL USING (true)` — then immediately write proper policies and remove temp policy |
+| OAuth redirecting to wrong URL | LOW | Update Site URL and Redirect URLs in Supabase Auth dashboard; no code change needed |
+| Existing v1.0 data invisible after migration | MEDIUM | Write a data migration: `UPDATE items SET user_id = '<owner_uuid>' WHERE user_id IS NULL AND list_id = '<list_id>'` for each affected list |
+| Auth state flash in production (user sees login page briefly) | LOW | Add `isLoading` guard to protected route; one code change, one deploy |
+| Realtime events stop after 1 hour | MEDIUM | Add `supabase.realtime.setAuth(session.access_token)` to `onAuthStateChange` handler; requires retesting Realtime subscription lifecycle |
+| Invitation security hole (table fully open) | HIGH | Immediately enable RLS on invitations table; implement SECURITY DEFINER function pattern; may require invite links to be re-issued |
+
+---
+
+## Pitfall-to-Phase Mapping
+
+| Pitfall | Prevention Phase | Verification |
+|---------|------------------|--------------|
+| RLS enabled without policies (P1) | Auth foundation | Run integration test as authenticated user: confirm items are visible |
+| v1.0 data migration strategy (P2) | Auth foundation | Verify all pre-migration items visible in app after migration runs |
+| Google OAuth redirect misconfiguration (P3) | Auth foundation | Test sign-in on localhost, preview URL, and production URL before any other feature work |
+| Auth state flash / isLoading guard (P4) | Auth foundation | Hard-reload the list page while signed in; must not flash the login screen |
+| Missing WITH CHECK on INSERT/UPDATE policies (P5) | Auth foundation | Attempt to POST an item with a fabricated `user_id` — must be rejected |
+| Unwrapped `auth.uid()` in policies (P6) | Auth foundation | Grep all SQL migration files; run Supabase Performance Advisor |
+| Realtime channel not inheriting auth (P7) | Auth foundation | Sign in, open list, wait 61 minutes, add item on device 2 — must appear on device 1 |
+| Invitation table RLS hole (P8) | List sharing phase | Attempt to read all invitations without a token — must return empty or error |
+| `getSession()` for authorization (P9) | Auth foundation | Code review: confirm `getUser()` is used in any auth-gating logic |
 
 ---
 
 ## Sources
 
-- [Supabase Realtime in Practice: WebSocket Connection Management](https://eastondev.com/blog/en/posts/dev/supabase-realtime-practice/) — silent disconnection patterns, background tab throttling
-- [Supabase Realtime Limits](https://supabase.com/docs/guides/realtime/limits) — free tier concurrent connections and message rates
-- [Supabase Free Tier Limits 2026](https://aiagencyplus.com/supabase-free-tier-limits/) — project pause policy, storage and connection caps
-- [Prevent Supabase Free Tier Pausing](https://shadhujan.medium.com/how-to-keep-supabase-free-tier-projects-active-d60fd4a17263) — keep-alive cron job solutions
-- [supabase-pause-prevention GitHub repo](https://github.com/travisvn/supabase-pause-prevention) — ready-made GitHub Actions workflow
-- [Supabase Security: Exposed Anon Keys, RLS, and Misconfigurations](https://www.stingrai.io/blog/supabase-powerful-but-one-misconfiguration-away-from-disaster) — RLS pitfalls and real-world incidents
-- [Row Level Security | Supabase Docs](https://supabase.com/docs/guides/database/postgres/row-level-security) — RLS policy design
-- [Handling Race Conditions in Real-Time Apps](https://dev.to/mattlewandowski93/handling-race-conditions-in-real-time-apps-49c8) — fetch/subscribe gap and event queueing patterns
-- [Sensitive data in URLs: Why private links aren't private](https://pulsesecurity.co.nz/articles/unguessable_url_issues) — shared link access risks
-- [Touch Targets on Touchscreens — Nielsen Norman Group](https://www.nngroup.com/articles/touch-target-size/) — minimum touch target sizing
-- [Safari dropping WebSocket connection due to inactivity](https://github.com/socketio/socket.io/issues/2924) — iOS Safari-specific WebSocket disconnection behavior
-- [Optimistic UI updates and conflict resolution](https://borstch.com/snippet/optimistic-ui-updates-and-conflict-resolution) — server-truth reconciliation pattern
+- [Supabase Row Level Security](https://supabase.com/docs/guides/database/postgres/row-level-security) — USING vs WITH CHECK, auth.uid() caching pattern (HIGH confidence)
+- [Supabase RLS Performance and Best Practices](https://supabase.com/docs/guides/troubleshooting/rls-performance-and-best-practices-Z5Jjwv) — (select auth.uid()) vs auth.uid() benchmarks (HIGH confidence)
+- [Supabase Realtime Authorization](https://supabase.com/docs/guides/realtime/authorization) — policy caching, setAuth(), JWT expiration behavior (HIGH confidence)
+- [Supabase Auth Redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls) — Vercel wildcard patterns, Site URL configuration (HIGH confidence)
+- [Google oauth redirects to localhost on production · supabase Discussion #25756](https://github.com/orgs/supabase/discussions/25756) — real-world redirect misconfiguration (HIGH confidence)
+- [Google OAuth redirect URL with Vercel Preview URLs — Vercel Community](https://community.vercel.com/t/google-oauth-redirect-url-with-vercel-preview-urls-supabase/6345) — Vercel-specific patterns (MEDIUM confidence)
+- [Login with Google | Supabase Docs](https://supabase.com/docs/guides/auth/social-login/auth-google) — Authorized JavaScript Origins vs Redirect URIs, required scopes (HIGH confidence)
+- [Supabase auth.getSession vs auth.getUser — GitHub Discussion #4400](https://github.com/orgs/supabase/discussions/4400) — security difference between the two (HIGH confidence)
+- [Security and performance risk with getUser and getSession · Issue #898](https://github.com/supabase/auth-js/issues/898) — official acknowledgment of getSession insecurity server-side (HIGH confidence)
+- [How to implement RLS for a team invite system with Supabase](https://boardshape.com/engineering/how-to-implement-rls-for-a-team-invite-system-with-supabase) — SECURITY DEFINER function pattern for invitations (MEDIUM confidence)
+- [Supabase RLS: Common Mistakes and CVE-2025-48757](https://vibeappscanner.com/supabase-row-level-security) — RLS disabled by default, real-world exposure incidents (MEDIUM confidence)
+- [onAuthStateChange API Reference](https://supabase.com/docs/reference/javascript/auth-onauthstatechange) — INITIAL_SESSION timing, async callback deadlock (HIGH confidence)
+- [Realtime delete event not containing all old data when RLS enabled · Discussion #12471](https://github.com/orgs/supabase/discussions/12471) — DELETE payload only contains PK when RLS on (HIGH confidence — already handled in itemsStore.ts)
+- [Race condition between isAuthenticated and isLoading — auth0-react Issue #343](https://github.com/auth0/auth0-react/issues/343) — auth state flash / double redirect pattern (MEDIUM confidence)
+
+---
+*Pitfalls research for: v2.0 Auth + Multi-List migration on existing anonymous grocery list app*
+*Researched: 2026-05-27*
