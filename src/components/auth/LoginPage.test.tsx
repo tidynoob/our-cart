@@ -6,9 +6,8 @@ import LoginPage from './LoginPage'
 describe('LoginPage', () => {
   it('renders h1 with text "Our Cart"', () => {
     render(<LoginPage onSignIn={vi.fn()} />)
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent(
-      'Our Cart',
-    )
+    const heading = screen.getByRole('heading', { level: 1 })
+    expect(heading.textContent).toBe('Our Cart')
   })
 
   it('renders subtitle text "Your shared grocery list"', () => {
