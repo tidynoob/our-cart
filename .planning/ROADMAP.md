@@ -46,7 +46,7 @@ Plans:
 
 - [x] 06-01-PLAN.md — OAuth provider config (human) + Wave 0 test scaffolds
 - [x] 06-02-PLAN.md — authStore TDD implementation (AUTH-01, AUTH-02)
-- [ ] 06-03-PLAN.md — ProtectedRoute TDD + App/router/supabase wiring (AUTH-03)
+- [x] 06-03-PLAN.md — ProtectedRoute TDD + App/router/supabase wiring (AUTH-03)
 - [ ] 06-04-PLAN.md — LandingPage transformation + LoginPage component (AUTH-01)
 - [x] 06-05-PLAN.md — Database migrations: items.user_id + lists.owner_id + RLS policies
 
@@ -118,7 +118,7 @@ Plans:
 | 3. Shopping Flow | v1.0 | 2/2 | Complete | 2026-05-25 |
 | 4. Real-Time Sync | v1.0 | 4/4 | Complete | 2026-05-26 |
 | 5. Mobile UX | v1.0 | 5/5 | Complete | 2026-05-26 |
-| 6. Auth Foundation | v2.0 | 3/5 | In Progress|  |
+| 6. Auth Foundation | v2.0 | 4/5 | In Progress|  |
 | 7. Lists Infrastructure | v2.0 | 0/? | Not started | - |
 | 8. App Shell & Sidebar | v2.0 | 0/? | Not started | - |
 | 9. Auth Integration into ListPage | v2.0 | 0/? | Not started | - |
