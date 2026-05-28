@@ -11,4 +11,8 @@ export const supabase = createClient(supabaseUrl, supabaseKey, {
   realtime: {
     worker: true, // heartbeat via Web Worker — survives browser timer throttling (D-07/SYNC-02)
   },
+  auth: {
+    flowType: 'pkce', // PKCE is Supabase default; explicit for clarity (D-12)
+    detectSessionInUrl: true,
+  },
 })
