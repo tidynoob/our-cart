@@ -1,10 +1,11 @@
 ---
 phase: 6
 slug: auth-foundation
-status: draft
-nyquist_compliant: false
-wave_0_complete: false
+status: validated
+nyquist_compliant: true
+wave_0_complete: true
 created: 2026-05-27
+validated: 2026-05-28
 ---
 
 # Phase 6 — Validation Strategy
@@ -36,22 +37,26 @@ created: 2026-05-27
 
 ## Per-Task Verification Map
 
-| Task ID | Plan | Wave | Requirement | Threat Ref | Secure Behavior | Test Type | Automated Command | File Exists | Status |
-|---------|------|------|-------------|------------|-----------------|-----------|-------------------|-------------|--------|
-| 06-01-01 | 01 | 1 | AUTH-01 | — | N/A | unit | `npx vitest run src/stores/authStore.test.ts` | ❌ W0 | ⬜ pending |
-| 06-01-02 | 01 | 1 | AUTH-02 | — | N/A | unit | `npx vitest run src/stores/authStore.test.ts` | ❌ W0 | ⬜ pending |
-| 06-02-01 | 02 | 1 | AUTH-03 | — | N/A | unit | `npx vitest run src/components/auth/ProtectedRoute.test.tsx` | ❌ W0 | ⬜ pending |
-| 06-03-01 | 03 | 1 | AUTH-01 | — | N/A | unit | `npx vitest run src/pages/LandingPage.test.tsx` | ❌ W0 | ⬜ pending |
+| Plan | Requirement | Threat Ref | Tests | Automated Command | File Exists | Status |
+|------|-------------|------------|-------|-------------------|-------------|--------|
+| 02 | AUTH-01, AUTH-02 | T-06-03/04/05 | 9 (initialize ×7, signInWithGoogle ×2) | `npx vitest run src/stores/authStore.test.ts` | ✅ | ✅ green |
+| 03 | AUTH-03 | T-06-06/07/08 | 4 (spinner, redirect, returnTo, Outlet) | `npx vitest run src/components/auth/ProtectedRoute.test.tsx` | ✅ | ✅ green |
+| 04 | AUTH-01 | T-06-09/10 | 6 (heading, subtitle, button, click, error ×2) | `npx vitest run src/components/auth/LoginPage.test.tsx` | ✅ | ✅ green |
+| 04 | AUTH-01 | — | 3 (login, authenticated, loading) | `npx vitest run src/pages/LandingPage.test.tsx` | ✅ | ✅ green |
+| 05 | AUTH-01/02/03 (DB) | T-06-11..14 | — (SQL migration, manual-only) | N/A | ✅ files | manual |
 
-*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky*
+*Status: ⬜ pending · ✅ green · ❌ red · ⚠️ flaky · manual = no automated path*
+
+**Total automated: 22 tests, all green.** signInWithGoogle assertion updated 2026-05-28 to match D-13 `redirectTo: window.location.origin`.
 
 ---
 
 ## Wave 0 Requirements
 
-- [ ] `src/stores/authStore.test.ts` — covers AUTH-01, AUTH-02
-- [ ] `src/components/auth/ProtectedRoute.test.tsx` — covers AUTH-03
-- [ ] New tests in `src/pages/LandingPage.test.tsx` — covers AUTH-01 UI conditional rendering
+- [x] `src/stores/authStore.test.ts` — covers AUTH-01, AUTH-02 (9 tests green)
+- [x] `src/components/auth/ProtectedRoute.test.tsx` — covers AUTH-03 (4 tests green)
+- [x] `src/pages/LandingPage.test.tsx` — covers AUTH-01 UI conditional rendering (3 tests green)
+- [x] `src/components/auth/LoginPage.test.tsx` — covers AUTH-01 login UI (6 tests green, added Plan 04)
 
 ---
 
@@ -69,11 +74,23 @@ created: 2026-05-27
 
 ## Validation Sign-Off
 
-- [ ] All tasks have `<automated>` verify or Wave 0 dependencies
-- [ ] Sampling continuity: no 3 consecutive tasks without automated verify
-- [ ] Wave 0 covers all MISSING references
-- [ ] No watch-mode flags
-- [ ] Feedback latency < 5s
-- [ ] `nyquist_compliant: true` set in frontmatter
+- [x] All tasks have `<automated>` verify or Wave 0 dependencies
+- [x] Sampling continuity: no 3 consecutive tasks without automated verify
+- [x] Wave 0 covers all MISSING references
+- [x] No watch-mode flags
+- [x] Feedback latency < 5s
+- [x] `nyquist_compliant: true` set in frontmatter
 
-**Approval:** pending
+**Approval:** validated 2026-05-28
+
+---
+
+## Validation Audit 2026-05-28
+
+| Metric | Count |
+|--------|-------|
+| Gaps found | 1 |
+| Resolved | 1 |
+| Escalated | 0 |
+
+**Gap:** `authStore.test.ts` signInWithGoogle assertion (`{ provider: 'google' }`) went stale after commit `4eaa26e fix(06): add redirectTo option to signInWithOAuth (D-13)` added `options.redirectTo` to the implementation. Test was RED; impl was correct (confirmed in 06-VERIFICATION.md truth #1). **Resolved** by updating the test assertion to `{ provider: 'google', options: { redirectTo: window.location.origin } }`. No implementation files modified. 22/22 auth tests green.
