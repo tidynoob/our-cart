@@ -154,7 +154,10 @@ describe('authStore — signInWithGoogle', () => {
 
     await useAuthStore.getState().signInWithGoogle()
 
-    expect(mockSignInWithOAuth).toHaveBeenCalledWith({ provider: 'google' })
+    expect(mockSignInWithOAuth).toHaveBeenCalledWith({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    })
   })
 
   it('sets error state when signInWithOAuth returns an error (AUTH-01)', async () => {
