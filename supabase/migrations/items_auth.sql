@@ -13,7 +13,7 @@
 -- Anonymous inserts (no auth session) will have user_id = NULL, which is correct.
 ALTER TABLE items
   ADD COLUMN user_id uuid REFERENCES auth.users(id) ON DELETE SET NULL
-  DEFAULT (select auth.uid());
+  DEFAULT auth.uid();
 
 -- Step 2: Drop ALL existing items policies
 -- Covers v1.0 policies and any that may have been added in later phases.
