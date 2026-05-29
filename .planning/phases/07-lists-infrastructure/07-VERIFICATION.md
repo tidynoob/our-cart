@@ -1,32 +1,20 @@
 ---
 phase: 07-lists-infrastructure
 verified: 2026-05-28T23:35:00Z
-status: human_needed
+status: verified
 score: 13/13 must-haves verified
 overrides_applied: 0
-human_verification:
-  - test: "Create a new list, give it a name, and confirm it appears in the lists-home as a navigable link"
-    expected: "List row appears immediately (optimistic); link navigates to /list/:share_code; list persists on refresh"
-    why_human: "End-to-end Supabase insert + navigation cannot be verified without a live browser and real auth session"
-  - test: "Rename a list from the lists-home and verify the new name appears on the list row AND in the ListPage header immediately"
-    expected: "Inline rename saves; LandingPage row updates; navigating to /list/:code shows the new name in the header (D-06 live-name-from-store)"
-    why_human: "Cross-page live-name propagation via Zustand store cache requires runtime navigation between routes"
-  - test: "Delete a list from the lists-home: (a) click Trash2, (b) confirm dialog shows 'and all its items' copy, (c) click Cancel — list survives, (d) click Trash2 again, click Delete — list disappears"
-    expected: "(c) list row still present; (d) list row gone; cancelling mid-delete leaves the list intact"
-    why_human: "Dialog render + Supabase delete + optimistic remove require live DOM interaction and real auth"
-  - test: "Delete a list from within the ListPage (navigate to /list/:code, click Trash2 in header, confirm delete)"
-    expected: "Dialog shows 'This removes the list and all its items permanently.'; confirming navigates to / and the list URL returns 'List not found'"
-    why_human: "navigate('/') after deleteList requires runtime routing; Supabase ON DELETE CASCADE behavior requires real DB"
-  - test: "Verify owner guard: sign in as User A, create a list, copy the URL, then open it in a different browser logged in as User B (or simulate non-owner by inspecting owner_id mismatch)"
-    expected: "Rename and delete Pencil/Trash2 buttons do NOT appear for non-owner; list content still viewable"
-    why_human: "isOwner guard requires two auth identities; cannot verify programmatically without real Supabase sessions"
+human_verified: 2026-05-29T00:00:00Z
+# Human UAT recorded in 07-HUMAN-UAT.md: 4/5 passed (create, rename, delete-from-home,
+# delete-from-ListPage). Owner-guard non-owner test BLOCKED on Phase 10 (List Sharing) —
+# tracked as the sole open item in 07-HUMAN-UAT.md, not re-listed here.
 ---
 
 # Phase 7: Lists Infrastructure Verification Report
 
 **Phase Goal:** Users own named lists and can create, rename, and delete them.
 **Verified:** 2026-05-28T23:35:00Z
-**Status:** human_needed
+**Status:** verified (human UAT 4/5 passed — owner-guard blocked on Phase 10; see 07-HUMAN-UAT.md)
 **Re-verification:** No — initial verification
 
 ## Goal Achievement

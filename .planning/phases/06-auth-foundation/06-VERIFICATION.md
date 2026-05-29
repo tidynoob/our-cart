@@ -1,32 +1,19 @@
 ---
 phase: 06-auth-foundation
 verified: 2026-05-28T11:20:00Z
-status: human_needed
+status: verified
 score: 10/10
 overrides_applied: 0
-human_verification:
-  - test: "Complete Google OAuth sign-in flow end-to-end"
-    expected: "User taps 'Sign in with Google', completes Google consent, returns to the app signed in. The landing page shows 'Create a list' and 'Join a list' forms instead of the login screen."
-    why_human: "OAuth flow involves browser redirect to Google and back -- cannot be tested with grep or vitest"
-  - test: "Session persists across browser close and reopen"
-    expected: "After signing in, close the browser entirely. Reopen and navigate to the app URL. User should still be signed in without re-authenticating."
-    why_human: "Requires real browser session persistence behavior -- localStorage/cookie survival across browser restart"
-  - test: "Protected route redirect preserves return-to URL"
-    expected: "While signed out, navigate directly to /list/SOMECODE. Should redirect to / showing login. After signing in, should automatically navigate to /list/SOMECODE."
-    why_human: "Full redirect chain involves OAuth browser redirect which resets the page -- grep cannot trace cross-page state"
-  - test: "SQL migrations applied successfully in Supabase"
-    expected: "items table has user_id column (uuid, nullable). lists table has owner_id column (uuid, nullable). Four RLS policies exist on each table (items_select/insert/update/delete, lists_select/insert/update/delete). Old anon_* policies are gone."
-    why_human: "Database state is in Supabase cloud -- cannot verify schema from local codebase"
-  - test: "Visual appearance of login page on mobile"
-    expected: "Login page shows centered 'Our Cart' heading, 'Your shared grocery list' subtitle, and 'Sign in with Google' button. Layout works on mobile viewport without overflow or clipping."
-    why_human: "Visual layout and mobile rendering require a real browser viewport"
+human_verified: 2026-05-29T00:00:00Z
+# Human UAT recorded in 06-UAT.md: 8/8 passed (2026-05-28). OAuth E2E, return-to-URL,
+# session persistence, Supabase migrations, and login visual all confirmed by human tester.
 ---
 
 # Phase 6: Auth Foundation Verification Report
 
 **Phase Goal:** Users can sign in with Google and the app knows who they are across sessions
 **Verified:** 2026-05-28T11:20:00Z
-**Status:** human_needed
+**Status:** verified (human UAT passed 8/8 — see 06-UAT.md)
 **Re-verification:** No -- initial verification
 
 ## Goal Achievement
