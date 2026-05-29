@@ -73,7 +73,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
-- [ ] 07-02-PLAN.md — LandingPage lists-home + CreateListForm migration to listsStore (LIST-01/02/03)
+- [x] 07-02-PLAN.md — LandingPage lists-home + CreateListForm migration to listsStore (LIST-01/02/03)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -132,7 +132,7 @@ Plans:
 | 4. Real-Time Sync | v1.0 | 4/4 | Complete | 2026-05-26 |
 | 5. Mobile UX | v1.0 | 5/5 | Complete | 2026-05-26 |
 | 6. Auth Foundation | v2.0 | 5/5 | Complete   | 2026-05-28 |
-| 7. Lists Infrastructure | v2.0 | 2/4 | In Progress|  |
+| 7. Lists Infrastructure | v2.0 | 3/4 | In Progress|  |
 | 8. App Shell & Sidebar | v2.0 | 0/? | Not started | - |
 | 9. Auth Integration into ListPage | v2.0 | 0/? | Not started | - |
 | 10. List Sharing | v2.0 | 0/? | Not started | - |

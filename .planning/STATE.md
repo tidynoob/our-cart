@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Accounts & Multi-List
 status: executing
-last_updated: "2026-05-29T03:13:13.484Z"
+last_updated: "2026-05-29T03:19:23.429Z"
 last_activity: 2026-05-29
 progress:
   total_phases: 5
   completed_phases: 1
   total_plans: 9
-  completed_plans: 7
+  completed_plans: 8
   percent: 20
 ---
 
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 ## Current Position
 
 Phase: 07 (lists-infrastructure) — EXECUTING
-Plan: 3 of 4
+Plan: 4 of 4
 Status: Ready to execute
 Last activity: 2026-05-29
 
@@ -47,6 +47,7 @@ Phase 10: List Sharing         [ ] Not started
 | Plans per phase | 3.8 avg | TBD |
 | LOC | 3,888 | TBD |
 | Phase 07 P01 | 59 | 2 tasks | 2 files |
+| Phase 07 P02 | 120 | 2 tasks | 5 files |
 
 ## Accumulated Context
 
@@ -90,7 +91,12 @@ Phase 10: List Sharing         [ ] Not started
 
 ## Session Continuity
 
-Last session: 2026-05-29T03:13:13.478Z
-Stopped at: Phase 7 UI-SPEC approved
+Last session: 2026-05-29T03:19:23.423Z
+Stopped at: Completed 07-02-PLAN.md — lists-home UI + CreateListForm migration
 Resume file: None
 Next action: `/gsd-plan-phase 6`
+
+## Decisions
+
+- [Phase ?]: useListsStore() called without selector in LandingPage for mock-compatible test behavior
+- [Phase ?]: CreateListForm delegates to listsStore.createList — owner_id NULL tech debt D-04 closed
