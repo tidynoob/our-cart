@@ -120,7 +120,26 @@ Plans:
   3. User can sign out from within the app and is returned to the login page
   4. A dismissed share-code header can be re-expanded without refreshing the page
 
-**Plans**: TBD
+**Plans**: 5 plans
+
+Plans:
+**Wave 0**
+
+- [ ] 09-00-PLAN.md — Wave 0 test scaffolds: AttributionBadge.test.tsx (PROF-02) + uiStore.test.ts (NAV-03)
+
+**Wave 1** *(blocked on Wave 0 completion)*
+
+- [ ] 09-01-PLAN.md — Item type user_id + authStore.updateDisplayName + uiStore.restoreBanner (PROF-01, PROF-02, NAV-03)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 09-02-PLAN.md — AttributionBadge avatar extension + ItemRow live attribution (PROF-02)
+- [ ] 09-03-PLAN.md — Sidebar profile section + AppShell user prop (PROF-01, PROF-02, PROF-03)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 09-04-PLAN.md — ListPage D-10 cleanup + D-11 re-expand + CategorySection prop threading + human verify (PROF-01, PROF-02, PROF-03, NAV-03)
+
 **UI hint**: yes
 
 ### Phase 10: List Sharing
@@ -148,7 +167,7 @@ Plans:
 | 6. Auth Foundation | v2.0 | 5/5 | Complete   | 2026-05-28 |
 | 7. Lists Infrastructure | v2.0 | 4/4 | Complete   | 2026-05-29 |
 | 8. App Shell & Sidebar | v2.0 | 3/3 | Complete   | 2026-05-29 |
-| 9. Auth Integration into ListPage | v2.0 | 0/? | Not started | - |
+| 9. Auth Integration into ListPage | v2.0 | 0/5 | Not started | - |
 | 10. List Sharing | v2.0 | 0/? | Not started | - |
 
 ---
@@ -158,3 +177,4 @@ Plans:
 *Phase 6 planned: 2026-05-27*
 *Phase 7 planned: 2026-05-28*
 *Phase 8 planned: 2026-05-29*
+*Phase 9 planned: 2026-05-29*
