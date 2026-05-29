@@ -3,7 +3,7 @@ import { useListsStore } from './listsStore'
 
 // vi.hoisted() — mocks available inside vi.mock() factory
 // (vi.mock is hoisted to the top of the file by Vitest, before variable declarations)
-const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle } =
+const { mockFrom, mockInsert, mockEq, mockOrder, mockSingle } =
   vi.hoisted(() => {
     const mockSingle = vi.fn()
     const mockOrder = vi.fn().mockReturnThis()
@@ -21,7 +21,7 @@ const { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOr
       order: mockOrder,
       single: mockSingle,
     })
-    return { mockFrom, mockSelect, mockInsert, mockUpdate, mockDelete, mockEq, mockOrder, mockSingle }
+    return { mockFrom, mockInsert, mockEq, mockOrder, mockSingle }
   })
 
 vi.mock('@/lib/supabase', () => ({

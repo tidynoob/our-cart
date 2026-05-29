@@ -99,7 +99,7 @@ describe('LandingPage — delete dialog (LIST-03)', () => {
       isLoading: false,
       error: null,
     })
-    ;(useListsStore as ReturnType<typeof vi.fn>).mockReturnValue({
+    ;(useListsStore as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       lists: [{ id: 'l1', name: 'Test List', share_code: 'abc12345', owner_id: 'u1', created_at: '' }],
       loading: false,
       error: null,

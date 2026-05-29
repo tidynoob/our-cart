@@ -16,7 +16,7 @@ vi.mock('react-router-dom', async () => {
 })
 
 // vi.hoisted — mock variables available inside vi.mock() factory
-const { mockFrom, mockSelect, mockEq, mockOrder } = vi.hoisted(() => {
+const { mockFrom } = vi.hoisted(() => {
   const mockOrder = vi.fn().mockResolvedValue({ data: [], error: null })
   const mockEq = vi.fn().mockReturnThis()
   const mockSelect = vi.fn().mockReturnThis()
@@ -25,7 +25,7 @@ const { mockFrom, mockSelect, mockEq, mockOrder } = vi.hoisted(() => {
     eq: mockEq,
     order: mockOrder,
   })
-  return { mockFrom, mockSelect, mockEq, mockOrder }
+  return { mockFrom }
 })
 
 vi.mock('@/lib/supabase', () => ({
