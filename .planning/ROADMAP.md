@@ -69,7 +69,7 @@ Plans:
 **Wave 1**
 
 - [x] 07-00-PLAN.md — Wave 0 test scaffolds: listsStore.test.ts (7 stubs) + LandingPage.test.tsx LIST-03 dialog tests
-- [ ] 07-01-PLAN.md — List type definition + listsStore Zustand store (fetchLists/createList/renameList/deleteList)
+- [x] 07-01-PLAN.md — List type definition + listsStore Zustand store (fetchLists/createList/renameList/deleteList)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -132,7 +132,7 @@ Plans:
 | 4. Real-Time Sync | v1.0 | 4/4 | Complete | 2026-05-26 |
 | 5. Mobile UX | v1.0 | 5/5 | Complete | 2026-05-26 |
 | 6. Auth Foundation | v2.0 | 5/5 | Complete   | 2026-05-28 |
-| 7. Lists Infrastructure | v2.0 | 1/4 | In Progress|  |
+| 7. Lists Infrastructure | v2.0 | 2/4 | In Progress|  |
 | 8. App Shell & Sidebar | v2.0 | 0/? | Not started | - |
 | 9. Auth Integration into ListPage | v2.0 | 0/? | Not started | - |
 | 10. List Sharing | v2.0 | 0/? | Not started | - |
