@@ -119,6 +119,8 @@ Use these entry points:
 - `/gsd-execute-phase` for planned phase work
 
 Do not make direct repo edits outside a GSD workflow unless the user explicitly asks to bypass it.
+
+When reporting information to me, be extremely concise and sacrifice grammar for the sake of consision.
 <!-- GSD:workflow-end -->
 
 
