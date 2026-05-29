@@ -1,12 +1,14 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { nanoid } from 'nanoid'
-import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/stores/authStore'
+import { useListsStore } from '@/stores/listsStore'
 import { Input } from '@/components/ui/input'
 import { buttonVariants } from '@/components/ui/button'
 
 export function CreateListForm() {
   const navigate = useNavigate()
+  const user = useAuthStore((state) => state.user)
+  const createList = useListsStore((state) => state.createList)
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -22,15 +24,9 @@ export function CreateListForm() {
     setLoading(true)
     setError(null)
 
-    // Generate the share code inside the submit handler — NOT at render or module scope (Pitfall 5)
-    const shareCode = nanoid(8)
+    const shareCode = await createList(name.trim(), user!.id)
 
-    const { error: supabaseError } = await supabase
-      .from('lists')
-      .insert({ name: name.trim(), share_code: shareCode })
-
-    if (supabaseError) {
-      // Never expose the raw Supabase error message (T-03-02, V7)
+    if (!shareCode) {
       setError('Could not create list. Please try again.')
       setLoading(false)
       return
