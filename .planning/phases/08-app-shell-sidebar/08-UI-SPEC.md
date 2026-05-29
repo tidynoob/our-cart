@@ -1,10 +1,11 @@
 ---
 phase: 8
 slug: app-shell-sidebar
-status: draft
+status: approved
 shadcn_initialized: true
 preset: base-nova (neutral)
 created: 2026-05-29
+reviewed_at: 2026-05-29
 ---
 
 # Phase 8 — UI Design Contract
@@ -36,6 +37,7 @@ Declared values (Tailwind v4 4px-base scale; multiples of 4 only):
 |-------|-------|---------------------|
 | xs | 4px (`gap-1`) | Icon-to-label gaps, trigger-icon button internal |
 | sm | 8px (`gap-2`, `py-2`) | Drawer nav vertical padding, header control gaps |
+| md-touch | 12px (`py-3`, `gap-3`) | Touch-target row padding — grid-aligned (4×3), matches `LandingPage` rows |
 | md | 16px (`p-4`) | Drawer header padding, row horizontal padding (`px-4`) |
 | lg | 24px | Reserved — not required this phase |
 | xl | 32px | Reserved — not required this phase |
@@ -51,12 +53,12 @@ All from Geist Variable. The codebase uses only two weights in this surface area
 
 | Role | Size | Weight | Line Height | Token |
 |------|------|--------|-------------|-------|
-| Drawer title ("Your Lists") | 16px | 500 (medium) | leading-none (~1.0) | `font-heading text-base font-medium leading-none` — mirrors `DialogTitle` |
+| Drawer title ("Your Lists") | 16px | 600 (semibold) | leading-none (~1.0) | `font-heading text-base font-semibold leading-none` |
 | List row label (default) | 14px | 400 (normal) | ~1.4 | `text-sm font-normal` — mirrors `LandingPage` rows |
 | List row label (active) | 14px | 600 (semibold) | ~1.4 | `text-sm font-semibold` — active-state weight bump (NAV-02) |
 | Empty-state / muted text | 14px | 400 (normal) | ~1.4 | `text-sm text-muted-foreground` |
 
-Weights: regular (400) + semibold/medium (500–600). Body line-height for the read-only nav is the Tailwind `text-sm` default (~1.43); headings `leading-none` to match the existing `DialogTitle`. Do not introduce new font sizes beyond `text-base`/`text-sm`.
+Weights: regular (400) + semibold (600) — exactly two. The drawer title and the active row both use 600; everything else uses 400, so the active-row weight bump (400 → 600) is the single hierarchy step. Body line-height for the read-only nav is the Tailwind `text-sm` default (~1.43); headings `leading-none` to match the existing `DialogTitle`. Do not introduce new font sizes beyond `text-base`/`text-sm`.
 
 ---
 
@@ -95,7 +97,7 @@ Prescriptive specs the executor implements against. All classes are Tailwind v4 
 
 ### Drawer header
 - Layout: `flex items-center justify-between p-4 border-b border-sidebar-border`.
-- Title: `<DialogPrimitive.Title>` "Your Lists" — `font-heading text-base font-medium leading-none`.
+- Title: `<DialogPrimitive.Title>` "Your Lists" — `font-heading text-base font-semibold leading-none`.
 - Close affordance: `<DialogPrimitive.Close>` rendering a `<Button variant="ghost" size="icon-sm">` with lucide `XIcon` (`size-4`) + `<span className="sr-only">Close</span>` — exact match to the existing dialog close button.
 
 ### Phase 9 profile slot (forward-compat — DO NOT FILL)
@@ -160,11 +162,11 @@ No `npx shadcn add` is run in this phase. The drawer reuses installed primitives
 
 ## Checker Sign-Off
 
-- [ ] Dimension 1 Copywriting: PASS
-- [ ] Dimension 2 Visuals: PASS
-- [ ] Dimension 3 Color: PASS
-- [ ] Dimension 4 Typography: PASS
-- [ ] Dimension 5 Spacing: PASS
-- [ ] Dimension 6 Registry Safety: PASS
+- [x] Dimension 1 Copywriting: PASS
+- [x] Dimension 2 Visuals: PASS
+- [x] Dimension 3 Color: PASS
+- [x] Dimension 4 Typography: PASS
+- [x] Dimension 5 Spacing: PASS
+- [x] Dimension 6 Registry Safety: PASS
 
-**Approval:** pending
+**Approval:** approved 2026-05-29
