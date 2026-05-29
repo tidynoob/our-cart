@@ -508,17 +508,19 @@ const isActive = list.share_code === activeCode
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
-1. **Hamburger trigger positioning strategy**
+1. **Hamburger trigger positioning strategy** — RESOLVED in plan 08-02 Task 2.
    - What we know: AppShell renders above ListPage via Outlet; ListPage has a flex header row with list name, rename/delete controls, and SyncStatus.
    - What's unclear: Whether the trigger should be inside the ListPage header row (requiring a prop/callback from AppShell) or overlaid via `position: fixed` from AppShell.
    - Recommendation: Pass an `onOpenSidebar` callback or use React context to let ListPage render the trigger in the correct header position. This avoids fixed-position collision with the existing header layout.
+   - **Resolution:** Thin `SidebarContext` carries the `onOpenSidebar` callback (+ `triggerRef`) from AppShell down to ListPage; ListPage renders the hamburger in its own header row leading-left. Open state stays local to AppShell (D-03 preserved — context carries a setter, not the boolean).
 
-2. **Empty state in sidebar when `lists.length === 0`**
+2. **Empty state in sidebar when `lists.length === 0`** — RESOLVED in plan 08-02 Task 1 + UI-SPEC.
    - What we know: A user on `/list/:code` always owns at least the list they're viewing, so true zero-list is edge case (legacy NULL owner lists only).
    - What's unclear: Copy and design for this edge case.
    - Recommendation: Show a simple "No lists found" message; reuse muted-foreground text style from LandingPage empty state.
+   - **Resolution:** Empty-state copy "No lists yet" in `text-sm text-muted-foreground` (per UI-SPEC), matching the LandingPage empty state.
 
 ---
 
