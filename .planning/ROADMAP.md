@@ -96,7 +96,7 @@ Plans:
 Plans:
 **Wave 0**
 
-- [ ] 08-00-PLAN.md — Wave 0 test scaffolds: AppShell.test.tsx (4 stubs), Sidebar.test.tsx (4 stubs), router.test.tsx (1 stub)
+- [x] 08-00-PLAN.md — Wave 0 test scaffolds: AppShell.test.tsx (4 stubs), Sidebar.test.tsx (4 stubs), router.test.tsx (1 stub)
 
 **Wave 1** *(blocked on Wave 0 completion)*
 
@@ -147,7 +147,7 @@ Plans:
 | 5. Mobile UX | v1.0 | 5/5 | Complete | 2026-05-26 |
 | 6. Auth Foundation | v2.0 | 5/5 | Complete   | 2026-05-28 |
 | 7. Lists Infrastructure | v2.0 | 4/4 | Complete   | 2026-05-29 |
-| 8. App Shell & Sidebar | v2.0 | 0/3 | Not started | - |
+| 8. App Shell & Sidebar | v2.0 | 1/3 | In Progress|  |
 | 9. Auth Integration into ListPage | v2.0 | 0/? | Not started | - |
 | 10. List Sharing | v2.0 | 0/? | Not started | - |
 
