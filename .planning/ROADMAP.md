@@ -129,7 +129,7 @@ Plans:
 
 **Wave 1** *(blocked on Wave 0 completion)*
 
-- [ ] 09-01-PLAN.md — Item type user_id + authStore.updateDisplayName + uiStore.restoreBanner (PROF-01, PROF-02, NAV-03)
+- [x] 09-01-PLAN.md — Item type user_id + authStore.updateDisplayName + uiStore.restoreBanner (PROF-01, PROF-02, NAV-03)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -167,7 +167,7 @@ Plans:
 | 6. Auth Foundation | v2.0 | 5/5 | Complete   | 2026-05-28 |
 | 7. Lists Infrastructure | v2.0 | 4/4 | Complete   | 2026-05-29 |
 | 8. App Shell & Sidebar | v2.0 | 3/3 | Complete   | 2026-05-29 |
-| 9. Auth Integration into ListPage | v2.0 | 1/5 | In Progress|  |
+| 9. Auth Integration into ListPage | v2.0 | 2/5 | In Progress|  |
 | 10. List Sharing | v2.0 | 0/? | Not started | - |
 
 ---
