@@ -100,7 +100,7 @@ Plans:
 
 **Wave 1** *(blocked on Wave 0 completion)*
 
-- [ ] 08-01-PLAN.md — SidebarContext + AppShell layout route + router.tsx wiring (NAV-01 / D-01 / D-03 / D-05)
+- [x] 08-01-PLAN.md — SidebarContext + AppShell layout route + router.tsx wiring (NAV-01 / D-01 / D-03 / D-05)
 
 **Wave 2** *(blocked on Wave 1 completion)*
 
@@ -147,7 +147,7 @@ Plans:
 | 5. Mobile UX | v1.0 | 5/5 | Complete | 2026-05-26 |
 | 6. Auth Foundation | v2.0 | 5/5 | Complete   | 2026-05-28 |
 | 7. Lists Infrastructure | v2.0 | 4/4 | Complete   | 2026-05-29 |
-| 8. App Shell & Sidebar | v2.0 | 1/3 | In Progress|  |
+| 8. App Shell & Sidebar | v2.0 | 2/3 | In Progress|  |
 | 9. Auth Integration into ListPage | v2.0 | 0/? | Not started | - |
 | 10. List Sharing | v2.0 | 0/? | Not started | - |
 

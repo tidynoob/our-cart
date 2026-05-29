@@ -27,7 +27,7 @@ Requirements for Accounts & Multi-List milestone. Each maps to roadmap phases.
 
 ### Navigation
 
-- [ ] **NAV-01**: User can open a slide-in sidebar showing all their lists
+- [x] **NAV-01**: User can open a slide-in sidebar showing all their lists
 - [ ] **NAV-02**: Currently viewed list is visually highlighted in sidebar
 - [ ] **NAV-03**: User can re-expand the dismissed share code header
 
@@ -81,7 +81,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | LIST-01 | Phase 7 | Complete |
 | LIST-02 | Phase 7 | Complete |
 | LIST-03 | Phase 7 | Complete |
-| NAV-01 | Phase 8 | Pending |
+| NAV-01 | Phase 8 | Complete |
 | NAV-02 | Phase 8 | Pending |
 | PROF-01 | Phase 9 | Pending |
 | PROF-02 | Phase 9 | Pending |
