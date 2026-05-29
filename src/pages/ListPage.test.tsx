@@ -1,10 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, waitFor, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 import ListPage from './ListPage'
 import { useItemsStore } from '@/stores/itemsStore'
+import { useAuthStore } from '@/stores/authStore'
+import { useUIStore } from '@/stores/uiStore'
 import { supabase } from '@/lib/supabase'
+import type { User } from '@supabase/supabase-js'
 
 const mockEq = vi.fn()
 const mockSingle = vi.fn()
@@ -89,6 +92,19 @@ vi.mock('@/lib/supabase', () => ({
   },
 }))
 
+/** A minimal User object sufficient for resolveDisplayName and owner checks. */
+function makeUser(overrides: Partial<User> = {}): User {
+  return {
+    id: 'user-test-id',
+    email: 'test@example.com',
+    app_metadata: {},
+    user_metadata: { display_name: 'Test User' },
+    aud: 'authenticated',
+    created_at: new Date().toISOString(),
+    ...overrides,
+  } as User
+}
+
 function renderAtRoute(code: string) {
   return render(
     <MemoryRouter initialEntries={[`/list/${code}`]}>
@@ -104,6 +120,8 @@ describe('ListPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockItemsResponse = []
+    useAuthStore.setState({ user: makeUser(), isLoading: false, error: null })
+    useUIStore.setState({ dismissedBanners: new Set() })
   })
 
   it('renders the list name when Supabase returns data (SHARE-02)', async () => {
@@ -112,6 +130,7 @@ describe('ListPage', () => {
         id: '1',
         name: 'Groceries',
         share_code: 'ABC12345',
+        owner_id: 'other-user',
         created_at: new Date().toISOString(),
       },
       error: null,
@@ -146,6 +165,7 @@ describe('ListPage', () => {
         id: '1',
         name: 'Groceries',
         share_code: 'ABC12345',
+        owner_id: 'other-user',
         created_at: new Date().toISOString(),
       },
       error: null,
@@ -171,6 +191,7 @@ function setupListWithItems(items: typeof mockItemsResponse) {
       id: 'list-id-1',
       name: 'Groceries',
       share_code: 'ABC12345',
+      owner_id: 'other-user',
       created_at: new Date().toISOString(),
     },
     error: null,
@@ -183,12 +204,8 @@ describe('ListPage — clear completed flow (D-06, D-07, SHOP-03, SHOP-04)', () 
     mockItemsResponse = []
     // Reset Zustand store between tests to avoid state leakage
     useItemsStore.setState({ items: [], loading: false, error: null, syncStatus: 'connecting', channel: null })
-    // Provide a stored user name so NamePromptDialog doesn't block rendering
-    localStorage.setItem('our-cart-name-list-id-1', 'TestUser')
-  })
-
-  afterEach(() => {
-    localStorage.removeItem('our-cart-name-list-id-1')
+    useAuthStore.setState({ user: makeUser(), isLoading: false, error: null })
+    useUIStore.setState({ dismissedBanners: new Set() })
   })
 
   it('no button when no checked items: Clear completed button is absent from DOM (D-06)', async () => {
@@ -289,11 +306,8 @@ describe('ListPage — reconnect event handlers', () => {
     vi.clearAllMocks()
     mockItemsResponse = []
     useItemsStore.setState({ items: [], loading: false, error: null, syncStatus: 'connecting', channel: null })
-    localStorage.setItem('our-cart-name-list-id-1', 'TestUser')
-  })
-
-  afterEach(() => {
-    localStorage.removeItem('our-cart-name-list-id-1')
+    useAuthStore.setState({ user: makeUser(), isLoading: false, error: null })
+    useUIStore.setState({ dismissedBanners: new Set() })
   })
 
   it('re-subscribes (which internally fetches) when document becomes visible (visibilitychange → visible) (SYNC-02)', async () => {
@@ -362,11 +376,8 @@ describe('ListPage — offline/online syncStatus handlers', () => {
     vi.clearAllMocks()
     mockItemsResponse = []
     useItemsStore.setState({ items: [], loading: false, error: null, syncStatus: 'connecting', channel: null })
-    localStorage.setItem('our-cart-name-list-id-1', 'TestUser')
-  })
-
-  afterEach(() => {
-    localStorage.removeItem('our-cart-name-list-id-1')
+    useAuthStore.setState({ user: makeUser(), isLoading: false, error: null })
+    useUIStore.setState({ dismissedBanners: new Set() })
   })
 
   it('sets syncStatus to "reconnecting" immediately on window offline event (SYNC-03)', async () => {
@@ -417,5 +428,97 @@ describe('ListPage — offline/online syncStatus handlers', () => {
 
     // subscribeToList should have been called again (creates a new channel)
     expect((supabase.channel as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(initialChannelCalls)
+  })
+})
+
+describe('ListPage — D-10/NAV-03', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockItemsResponse = []
+    useItemsStore.setState({ items: [], loading: false, error: null, syncStatus: 'connecting', channel: null })
+    useAuthStore.setState({ user: makeUser(), isLoading: false, error: null })
+    useUIStore.setState({ dismissedBanners: new Set() })
+  })
+
+  it('does not render NamePromptDialog; AddItemBar is active for authenticated user (D-10)', async () => {
+    setupListWithItems([])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    // No name prompt copy should appear
+    expect(screen.queryByText("What's your name?")).toBeNull()
+    expect(screen.queryByText('So your partner knows who added what')).toBeNull()
+
+    // AddItemBar input is active (not disabled)
+    const input = screen.getByPlaceholderText('Add an item...')
+    expect((input as HTMLInputElement).disabled).toBe(false)
+  })
+
+  it('AddItemBar receives non-empty addedBy from auth display name (D-10)', async () => {
+    useAuthStore.setState({
+      user: makeUser({ user_metadata: { display_name: 'Alice' } }),
+      isLoading: false,
+      error: null,
+    })
+    setupListWithItems([])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    // The AddItemBar is rendered (not disabled/hidden)
+    const input = screen.getByPlaceholderText('Add an item...')
+    expect((input as HTMLInputElement).disabled).toBe(false)
+  })
+
+  it('Share2 button is absent when banner is visible (NAV-03 inverse)', async () => {
+    // dismissedBanners does NOT contain the share code
+    useUIStore.setState({ dismissedBanners: new Set() })
+    setupListWithItems([])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    expect(screen.queryByLabelText('Show share code')).toBeNull()
+  })
+
+  it('Share2 button is visible when banner is dismissed (NAV-03)', async () => {
+    // dismissedBanners contains the share code for this list
+    useUIStore.setState({ dismissedBanners: new Set(['ABC12345']) })
+    setupListWithItems([])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    expect(screen.getByLabelText('Show share code')).toBeTruthy()
+  })
+
+  it('Share2 button click calls restoreBanner (NAV-03)', async () => {
+    const mockRestoreBanner = vi.fn()
+    useUIStore.setState({
+      dismissedBanners: new Set(['ABC12345']),
+      restoreBanner: mockRestoreBanner,
+    })
+    setupListWithItems([])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    const shareButton = screen.getByLabelText('Show share code')
+    await act(async () => {
+      await userEvent.click(shareButton)
+    })
+
+    expect(mockRestoreBanner).toHaveBeenCalledWith('ABC12345')
   })
 })

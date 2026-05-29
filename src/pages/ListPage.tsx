@@ -284,6 +284,12 @@ export default function ListPage() {
 
   const grouped = groupItemsByCategory(items)
 
+  // Current-user attribution values for CategorySection → ItemRow live attribution (D-04/D-06)
+  const currentUserDisplayName = user ? resolveDisplayName(user) : undefined
+  const currentUserAvatarUrl = user
+    ? (user.user_metadata?.avatar_url ?? user.user_metadata?.picture ?? null)
+    : null
+
   return (
     <div className="min-h-screen flex flex-col items-center">
       {/* ShareBanner shown until dismissed (D-04) */}
@@ -356,6 +362,17 @@ export default function ListPage() {
             </div>
           )}
           <SyncStatus />
+          {dismissedBanners.has(list.share_code) && (
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label="Show share code"
+              onClick={() => restoreBanner(list.share_code)}
+              className="h-8 w-8 shrink-0"
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
 
         <div className="mt-4 flex flex-col gap-6">
@@ -411,6 +428,9 @@ export default function ListPage() {
               onConfirmDelete={handleConfirmDelete}
               onCancelDelete={handleCancelDelete}
               onToggle={handleToggle}
+              currentUserId={user?.id ?? null}
+              currentUserDisplayName={currentUserDisplayName}
+              currentUserAvatarUrl={currentUserAvatarUrl}
             />
           ))}
 
