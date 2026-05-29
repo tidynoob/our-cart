@@ -64,7 +64,20 @@ Plans:
   3. User can delete a list — but only after confirming in a dialog; cancelling leaves the list intact
   4. Deleted lists no longer appear in navigation or at their URL
 
-**Plans**: TBD
+**Plans**: 4 plans
+Plans:
+**Wave 1**
+
+- [ ] 07-00-PLAN.md — Wave 0 test scaffolds: listsStore.test.ts (7 stubs) + LandingPage.test.tsx LIST-03 dialog tests
+- [ ] 07-01-PLAN.md — List type definition + listsStore Zustand store (fetchLists/createList/renameList/deleteList)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 07-02-PLAN.md — LandingPage lists-home + CreateListForm migration to listsStore (LIST-01/02/03)
+
+**Wave 3** *(blocked on Wave 2 completion)*
+
+- [ ] 07-03-PLAN.md — ListPage rename/delete affordances + live name from store + navigate-away on delete (LIST-02/03)
 
 ### Phase 8: App Shell & Sidebar
 
@@ -119,7 +132,7 @@ Plans:
 | 4. Real-Time Sync | v1.0 | 4/4 | Complete | 2026-05-26 |
 | 5. Mobile UX | v1.0 | 5/5 | Complete | 2026-05-26 |
 | 6. Auth Foundation | v2.0 | 5/5 | Complete   | 2026-05-28 |
-| 7. Lists Infrastructure | v2.0 | 0/? | Not started | - |
+| 7. Lists Infrastructure | v2.0 | 0/4 | Not started | - |
 | 8. App Shell & Sidebar | v2.0 | 0/? | Not started | - |
 | 9. Auth Integration into ListPage | v2.0 | 0/? | Not started | - |
 | 10. List Sharing | v2.0 | 0/? | Not started | - |
@@ -129,3 +142,4 @@ Plans:
 *v1.0 MVP shipped: 2026-05-26*
 *v2.0 roadmap added: 2026-05-27*
 *Phase 6 planned: 2026-05-27*
+*Phase 7 planned: 2026-05-28*

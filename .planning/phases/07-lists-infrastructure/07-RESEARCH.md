@@ -657,7 +657,7 @@ Key mocking requirements for `listsStore.test.ts`:
 
 ---
 
-## Open Questions
+## Open Questions (RESOLVED)
 
 1. **CreateListForm migration vs. parallel code path**
    - What we know: CreateListForm directly calls Supabase. listsStore.createList will also call Supabase.
