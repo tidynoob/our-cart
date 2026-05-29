@@ -62,22 +62,22 @@ export const useListsStore = create<ListsState>()((set, get) => ({
       .select()
       .single()
 
-    if (error) {
+    // Treat a null row (insert error OR RLS returning no row) as failure:
+    // returning the optimistic temp code would navigate to a list that does not exist.
+    if (error || !data) {
       // Rollback: remove the optimistic row and surface error
       set((state) => ({
         lists: state.lists.filter((l) => l.id !== tempId),
         error: 'Failed to create list',
       }))
       return ''
-    } else if (data) {
-      // Replace temp row with real DB row
-      set((state) => ({
-        lists: state.lists.map((l) => (l.id === tempId ? data : l)),
-      }))
-      return data.share_code
     }
 
-    return shareCode
+    // Replace temp row with real DB row
+    set((state) => ({
+      lists: state.lists.map((l) => (l.id === tempId ? data : l)),
+    }))
+    return data.share_code
   },
 
   renameList: async (id, name) => {

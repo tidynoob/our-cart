@@ -21,10 +21,15 @@ export function CreateListForm() {
       return
     }
 
+    if (!user) {
+      setError('Could not create list. Please try again.')
+      return
+    }
+
     setLoading(true)
     setError(null)
 
-    const shareCode = await createList(name.trim(), user!.id)
+    const shareCode = await createList(name.trim(), user.id)
 
     if (!shareCode) {
       setError('Could not create list. Please try again.')
