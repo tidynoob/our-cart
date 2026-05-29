@@ -21,7 +21,7 @@
 ### v2.0 Accounts & Multi-List
 
 - [x] **Phase 6: Auth Foundation** - Google OAuth sign-in, persistent session, route protection, and database auth scaffolding (completed 2026-05-28)
-- [ ] **Phase 7: Lists Infrastructure** - Multi-list database layer, CRUD operations, and route structure
+- [x] **Phase 7: Lists Infrastructure** - Multi-list database layer, CRUD operations, and route structure (completed 2026-05-29)
 - [ ] **Phase 8: App Shell & Sidebar** - Slide-in sidebar drawer with list navigation and visual active state
 - [ ] **Phase 9: Auth Integration into ListPage** - User profile display, display name editing, sign out, and header re-expand
 - [ ] **Phase 10: List Sharing** - Shareable invite links with redemption flow
@@ -77,7 +77,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
-- [ ] 07-03-PLAN.md — ListPage rename/delete affordances + live name from store + navigate-away on delete (LIST-02/03)
+- [x] 07-03-PLAN.md — ListPage rename/delete affordances + live name from store + navigate-away on delete (LIST-02/03)
 
 ### Phase 8: App Shell & Sidebar
 
@@ -132,7 +132,7 @@ Plans:
 | 4. Real-Time Sync | v1.0 | 4/4 | Complete | 2026-05-26 |
 | 5. Mobile UX | v1.0 | 5/5 | Complete | 2026-05-26 |
 | 6. Auth Foundation | v2.0 | 5/5 | Complete   | 2026-05-28 |
-| 7. Lists Infrastructure | v2.0 | 3/4 | In Progress|  |
+| 7. Lists Infrastructure | v2.0 | 4/4 | Complete   | 2026-05-29 |
 | 8. App Shell & Sidebar | v2.0 | 0/? | Not started | - |
 | 9. Auth Integration into ListPage | v2.0 | 0/? | Not started | - |
 | 10. List Sharing | v2.0 | 0/? | Not started | - |
