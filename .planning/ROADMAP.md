@@ -21,7 +21,7 @@
 ### v2.0 Accounts & Multi-List
 
 - [x] **Phase 6: Auth Foundation** - Google OAuth sign-in, persistent session, route protection, and database auth scaffolding (completed 2026-05-28)
-- [x] **Phase 7: Lists Infrastructure** - Multi-list database layer, CRUD operations, and route structure (completed 2026-05-29)
+- [x] **Phase 7: Lists Infrastructure** - Multi-list database layer, CRUD operations, and route structure (completed 2026-05-29)
 - [ ] **Phase 8: App Shell & Sidebar** - Slide-in sidebar drawer with list navigation and visual active state
 - [ ] **Phase 9: Auth Integration into ListPage** - User profile display, display name editing, sign out, and header re-expand
 - [ ] **Phase 10: List Sharing** - Shareable invite links with redemption flow
@@ -91,7 +91,21 @@ Plans:
   3. Tapping a list in the sidebar navigates to that list and closes the sidebar
   4. Sidebar is accessible on both mobile and desktop without layout breakage
 
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+**Wave 0**
+
+- [ ] 08-00-PLAN.md — Wave 0 test scaffolds: AppShell.test.tsx (4 stubs), Sidebar.test.tsx (4 stubs), router.test.tsx (1 stub)
+
+**Wave 1** *(blocked on Wave 0 completion)*
+
+- [ ] 08-01-PLAN.md — SidebarContext + AppShell layout route + router.tsx wiring (NAV-01 / D-01 / D-03 / D-05)
+
+**Wave 2** *(blocked on Wave 1 completion)*
+
+- [ ] 08-02-PLAN.md — Sidebar drawer component + ListPage hamburger trigger (NAV-01 / NAV-02 / D-02 / D-04 / D-06 / D-08)
+
 **UI hint**: yes
 
 ### Phase 9: Auth Integration into ListPage
@@ -133,7 +147,7 @@ Plans:
 | 5. Mobile UX | v1.0 | 5/5 | Complete | 2026-05-26 |
 | 6. Auth Foundation | v2.0 | 5/5 | Complete   | 2026-05-28 |
 | 7. Lists Infrastructure | v2.0 | 4/4 | Complete   | 2026-05-29 |
-| 8. App Shell & Sidebar | v2.0 | 0/? | Not started | - |
+| 8. App Shell & Sidebar | v2.0 | 0/3 | Not started | - |
 | 9. Auth Integration into ListPage | v2.0 | 0/? | Not started | - |
 | 10. List Sharing | v2.0 | 0/? | Not started | - |
 
@@ -143,3 +157,4 @@ Plans:
 *v2.0 roadmap added: 2026-05-27*
 *Phase 6 planned: 2026-05-27*
 *Phase 7 planned: 2026-05-28*
+*Phase 8 planned: 2026-05-29*
