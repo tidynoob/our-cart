@@ -9,9 +9,10 @@ interface SidebarProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   lists: List[]
+  finalFocus?: React.RefObject<HTMLButtonElement>
 }
 
-export default function Sidebar({ open, onOpenChange, lists }: SidebarProps) {
+export default function Sidebar({ open, onOpenChange, lists, finalFocus }: SidebarProps) {
   const match = useMatch('/list/:code')
   const activeCode = match?.params.code ?? null
 
@@ -19,9 +20,10 @@ export default function Sidebar({ open, onOpenChange, lists }: SidebarProps) {
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop
-          className="fixed inset-0 z-40 bg-black/40 duration-200 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+          className="fixed inset-0 z-40 bg-black/10 supports-backdrop-filter:backdrop-blur-xs duration-100 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
         />
         <DialogPrimitive.Popup
+          finalFocus={finalFocus}
           className={cn(
             'fixed inset-y-0 left-0 z-50',
             'h-dvh',
@@ -33,7 +35,7 @@ export default function Sidebar({ open, onOpenChange, lists }: SidebarProps) {
             'data-closed:animate-out data-closed:slide-out-to-left',
           )}
         >
-          <div className="flex items-center justify-between p-4 border-b">
+          <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
             <DialogPrimitive.Title className="font-heading text-base font-semibold leading-none">
               Your Lists
             </DialogPrimitive.Title>
@@ -75,6 +77,9 @@ export default function Sidebar({ open, onOpenChange, lists }: SidebarProps) {
               })
             )}
           </nav>
+
+          {/* Phase 9: profile section (avatar / name / sign-out) mounts here — PROF-01/02/03 */}
+          <div data-slot="profile-slot" className="mt-auto border-t border-sidebar-border p-4" />
         </DialogPrimitive.Popup>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
