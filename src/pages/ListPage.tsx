@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Pencil, Trash2 } from 'lucide-react'
+import { Menu, Pencil, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useUIStore } from '@/stores/uiStore'
 import { useItemsStore } from '@/stores/itemsStore'
@@ -13,6 +13,7 @@ import { NamePromptDialog } from '@/components/NamePromptDialog'
 import { AddItemBar } from '@/components/AddItemBar'
 import { CategorySection } from '@/components/CategorySection'
 import { SyncStatus } from '@/components/SyncStatus'
+import { useSidebarContext } from '@/contexts/SidebarContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -33,6 +34,7 @@ interface List {
 }
 
 export default function ListPage() {
+  const { onOpenSidebar, triggerRef } = useSidebarContext()
   const { code } = useParams<{ code: string }>()
   const navigate = useNavigate()
   const dismissedBanners = useUIStore((state) => state.dismissedBanners)
@@ -298,6 +300,16 @@ export default function ListPage() {
 
       <div className="w-full max-w-md p-4">
         <div className="flex items-center justify-between gap-2">
+          <Button
+            ref={triggerRef}
+            variant="ghost"
+            size="icon"
+            aria-label="Open navigation"
+            onClick={onOpenSidebar}
+            className="h-8 w-8 shrink-0"
+          >
+            <Menu className="h-4 w-4" />
+          </Button>
           {/* Header: inline rename input (owner only) or list name + controls */}
           {isOwner && listRenameOpen ? (
             <div className="flex items-center gap-2 flex-1 min-w-0">

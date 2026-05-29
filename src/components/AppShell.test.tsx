@@ -5,6 +5,9 @@ import AppShell from '@/components/AppShell'
 import ProtectedRoute from '@/components/auth/ProtectedRoute'
 import { useAuthStore } from '@/stores/authStore'
 import { useListsStore } from '@/stores/listsStore'
+import { useSidebarContext } from '@/contexts/SidebarContext'
+import { Menu } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 
 // vi.hoisted — mock variables available inside vi.mock() factory (hoisted before imports)
 const { mockFrom, mockSelect, mockEq, mockOrder } = vi.hoisted(() => {
@@ -31,13 +34,33 @@ vi.mock('@/lib/supabase', () => ({
   },
 }))
 
+// Mock child that uses SidebarContext to expose the hamburger trigger (mirrors ListPage)
+function MockListPageWithTrigger() {
+  const { onOpenSidebar, triggerRef } = useSidebarContext()
+  return (
+    <div>
+      <Button
+        ref={triggerRef}
+        variant="ghost"
+        size="icon"
+        aria-label="Open navigation"
+        onClick={onOpenSidebar}
+        className="h-8 w-8 shrink-0"
+      >
+        <Menu className="h-4 w-4" />
+      </Button>
+      <span>List Content</span>
+    </div>
+  )
+}
+
 function renderAtRoute(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <Routes>
         <Route element={<ProtectedRoute />}>
           <Route element={<AppShell />}>
-            <Route path="/list/:code" element={<div>List Content</div>} />
+            <Route path="/list/:code" element={<MockListPageWithTrigger />} />
           </Route>
         </Route>
       </Routes>
