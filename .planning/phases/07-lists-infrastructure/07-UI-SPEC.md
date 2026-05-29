@@ -53,12 +53,14 @@ All sizes use **Geist Variable** (`--font-sans`). Heading and body share the sam
 
 | Role | Size | Weight | Line Height | Tailwind Class |
 |------|------|--------|-------------|----------------|
-| Body | 14px | 400 (regular) | 1.5 | `text-sm` |
-| Label | 14px | 500 (medium) | 1.4 | `text-sm font-medium` |
+| Body | 14px | 400 (regular) | 1.5 | `text-sm font-normal` |
+| Label | 14px | 400 (regular) | 1.4 | `text-sm font-normal` |
 | Heading (page) | 30px | 700 (bold) | 1.2 | `text-3xl font-bold` |
-| Subheading (section) | 20px | 600 (semibold) | 1.2 | `text-xl font-semibold` |
+| Subheading (section) | 20px | 700 (bold) | 1.2 | `text-xl font-bold` |
 
-Source: Detected from `LandingPage.tsx` existing authenticated branch (`text-3xl font-bold` for "Our Cart", `text-xl font-semibold` for section headers) — no new sizes introduced.
+Labels are distinguished from body text by context (form field label position, row affordance) not weight. Subheadings use bold instead of semibold — no visual regression, same contrast hierarchy.
+
+Source: Detected from `LandingPage.tsx` existing authenticated branch (`text-3xl font-bold` for "Our Cart") — no new sizes introduced. Weights consolidated from 4 to 2 per checker requirement.
 
 ---
 
@@ -112,13 +114,13 @@ Vertical flex column, centered, mobile-first. Mirrors existing `LandingPage` aut
 
   <!-- Create affordance -->
   <section class="w-full max-w-sm mt-6">
-    <h2>Create a list</h2>                   <!-- text-xl font-semibold -->
+    <h2>Create a list</h2>                   <!-- text-xl font-bold -->
     <CreateListForm />                        <!-- existing, wired to listsStore -->
   </section>
 
   <!-- Owned lists collection -->
   <section class="w-full max-w-sm mt-6">
-    <h2>Your lists</h2>                      <!-- text-xl font-semibold, only rendered when lists.length > 0 -->
+    <h2>Your lists</h2>                      <!-- text-xl font-bold, only rendered when lists.length > 0 -->
     <ul>
       <ListRow /> × N
     </ul>
@@ -136,7 +138,7 @@ Each owned list renders as a full-width row with the list name as a navigable li
 
 ```
 <li class="flex items-center justify-between min-h-[48px] border-b border-border">
-  <a href="/list/:code" class="flex-1 py-3 text-sm font-medium truncate">
+  <a href="/list/:code" class="flex-1 py-3 text-sm font-normal truncate">
     {list.name}
   </a>
   <div class="flex items-center gap-2 pl-2 shrink-0">
@@ -165,7 +167,7 @@ When rename is triggered, the `<a>` name link is replaced in-place with an `Inpu
     aria-label="Rename list"
     class="flex-1 h-7 text-sm"
   />
-  <Button variant="outline" size="sm" onClick={handleRename}>Save</Button>
+  <Button variant="outline" size="sm" onClick={handleRename}>Save name</Button>
   <Button variant="ghost" size="sm" onClick={cancelRename}>Cancel</Button>
 </li>
 ```
@@ -223,7 +225,7 @@ Do not expose raw Supabase error strings — use this fixed copy only.
 
 ### Rename — Pending State
 
-While `renameList` call is in-flight: disable the Save button (`disabled`) and set its text to "Saving…". The Input remains interactive (user can keep typing — optimistic update already applied).
+While `renameList` call is in-flight: disable the "Save name" button (`disabled`) and set its text to "Saving…". The Input remains interactive (user can keep typing — optimistic update already applied).
 
 ### Delete — Pending State
 
@@ -248,7 +250,7 @@ After "Delete" is clicked in the dialog: disable both dialog buttons and change 
 | Lists fetch error | "Could not load your lists. Please refresh." |
 | Rename trigger (aria-label) | "Rename {list.name}" |
 | Rename input label (aria-label) | "Rename list" |
-| Rename save button | "Save" |
+| Rename save button | "Save name" |
 | Rename cancel button | "Cancel" |
 | Rename save pending | "Saving…" |
 | Rename error (empty) | "Name cannot be empty." |
@@ -265,6 +267,7 @@ Notes:
 - Single quotes around `{listName}` in dialog title — name may contain special characters; do not use smart quotes.
 - "permanently" in the description makes data loss explicit — do not soften to "removed" alone.
 - No exclamation marks in error copy — factual, not apologetic.
+- "Save name" (verb + noun) is preferred over bare "Save" — satisfies single-word CTA flag.
 
 ---
 
@@ -311,6 +314,7 @@ No third-party registries declared for this phase. All components already instal
 | Color tokens (oklch values) | `src/index.css` :root block |
 | Spacing scale (8-point, `max-w-sm`, `p-4`) | `LandingPage.tsx` + `CreateListForm.tsx` patterns |
 | Typography sizes (text-3xl, text-xl, text-sm) | `LandingPage.tsx` existing authenticated branch |
+| Typography weights (400 + 700 only) | Checker requirement — consolidated from 4 to 2 weights |
 | Dialog pattern (disablePointerDismissal, showCloseButton=false) | `ListPage.tsx` lines 318-342 |
 | Button variants (ghost, outline, destructive) | `src/components/ui/button.tsx` cva variants |
 | Delete copy ("all its items permanently") | D-08 (07-CONTEXT.md) — explicit requirement |
@@ -319,6 +323,7 @@ No third-party registries declared for this phase. All components already instal
 | Pencil + Trash2 icons | Discretion — lucide, already installed, universally understood |
 | "Create list" CTA copy | `CreateListForm.tsx` existing button text |
 | Empty-state copy | Claude's Discretion (07-CONTEXT.md) |
+| "Save name" button label | Optional improvement — verb + noun, resolves single-word flag |
 
 ---
 
