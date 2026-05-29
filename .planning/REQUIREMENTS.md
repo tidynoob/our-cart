@@ -17,7 +17,7 @@ Requirements for Accounts & Multi-List milestone. Each maps to roadmap phases.
 
 - [x] **PROF-01**: User can edit their display name
 - [x] **PROF-02**: User's Google avatar displays in sidebar and item attribution
-- [ ] **PROF-03**: User can sign out
+- [x] **PROF-03**: User can sign out
 
 ### List Management
 
@@ -85,7 +85,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NAV-02 | Phase 8 | Complete |
 | PROF-01 | Phase 9 | Complete |
 | PROF-02 | Phase 9 | Complete |
-| PROF-03 | Phase 9 | Pending |
+| PROF-03 | Phase 9 | Complete |
 | NAV-03 | Phase 9 | Complete |
 | SHARE-01 | Phase 10 | Pending |
 | SHARE-02 | Phase 10 | Pending |

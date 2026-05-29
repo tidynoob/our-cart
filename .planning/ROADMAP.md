@@ -134,7 +134,7 @@ Plans:
 **Wave 2** *(blocked on Wave 1 completion)*
 
 - [x] 09-02-PLAN.md — AttributionBadge avatar extension + ItemRow live attribution (PROF-02)
-- [ ] 09-03-PLAN.md — Sidebar profile section + AppShell user prop (PROF-01, PROF-02, PROF-03)
+- [x] 09-03-PLAN.md — Sidebar profile section + AppShell user prop (PROF-01, PROF-02, PROF-03)
 
 **Wave 3** *(blocked on Wave 2 completion)*
 
@@ -167,7 +167,7 @@ Plans:
 | 6. Auth Foundation | v2.0 | 5/5 | Complete   | 2026-05-28 |
 | 7. Lists Infrastructure | v2.0 | 4/4 | Complete   | 2026-05-29 |
 | 8. App Shell & Sidebar | v2.0 | 3/3 | Complete   | 2026-05-29 |
-| 9. Auth Integration into ListPage | v2.0 | 3/5 | In Progress|  |
+| 9. Auth Integration into ListPage | v2.0 | 4/5 | In Progress|  |
 | 10. List Sharing | v2.0 | 0/? | Not started | - |
 
 ---

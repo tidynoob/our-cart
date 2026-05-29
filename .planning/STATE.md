@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Accounts & Multi-List
 status: executing
-last_updated: "2026-05-29T16:26:13.313Z"
+last_updated: "2026-05-29T16:29:28.556Z"
 last_activity: 2026-05-29
 progress:
   total_phases: 5
   completed_phases: 3
   total_plans: 17
-  completed_plans: 15
+  completed_plans: 16
   percent: 60
 ---
 
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 ## Current Position
 
 Phase: 9 (Auth Integration into ListPage) — EXECUTING
-Plan: 4 of 5
+Plan: 5 of 5
 Status: Ready to execute
 Last activity: 2026-05-29
 
@@ -50,6 +50,7 @@ Phase 10: List Sharing         [ ] Not started
 | Phase 07 P02 | 120 | 2 tasks | 5 files |
 | Phase 07 P03 | 300 | 1 tasks | 1 files |
 | Phase 09 P01 | 10 | 2 tasks | 4 files |
+| Phase 09 P03 | 15 minutes | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -93,8 +94,8 @@ Phase 10: List Sharing         [ ] Not started
 
 ## Session Continuity
 
-Last session: 2026-05-29T16:26:13.306Z
-Stopped at: Phase 9 UI-SPEC approved
+Last session: 2026-05-29T16:29:28.549Z
+Stopped at: Completed 09-03-PLAN.md
 Resume file: None
 Next action: `/gsd-plan-phase 6`
 
@@ -103,3 +104,4 @@ Next action: `/gsd-plan-phase 6`
 - [Phase ?]: useListsStore() called without selector in LandingPage for mock-compatible test behavior
 - [Phase ?]: CreateListForm delegates to listsStore.createList — owner_id NULL tech debt D-04 closed
 - [Phase ?]: displayName = storedName ?? list?.name — store cache for live rename, local state fallback for direct URL nav (D-06/D-03)
+- [Phase ?]: ProfileSection extracted as local sub-component; handleSignOut closes drawer before redirect (D-09)
