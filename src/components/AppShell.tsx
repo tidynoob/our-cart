@@ -28,7 +28,7 @@ export default function AppShell() {
 
   return (
     <SidebarContext.Provider value={contextValue}>
-      <Sidebar open={open} onOpenChange={setOpen} lists={lists} finalFocus={triggerRef} />
+      <Sidebar open={open} onOpenChange={setOpen} lists={lists} user={user} finalFocus={triggerRef} />
       <Outlet />
     </SidebarContext.Provider>
   )

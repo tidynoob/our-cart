@@ -1,18 +1,137 @@
+import { useState } from 'react'
 import { Dialog as DialogPrimitive } from '@base-ui/react/dialog'
-import { XIcon } from 'lucide-react'
+import { XIcon, Pencil } from 'lucide-react'
 import { Link, useMatch } from 'react-router-dom'
+import type { User } from '@supabase/supabase-js'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { useAuthStore } from '@/stores/authStore'
 import type { List } from '@/types/list'
 
 interface SidebarProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   lists: List[]
+  user: User | null
   finalFocus?: React.RefObject<HTMLButtonElement>
 }
 
-export default function Sidebar({ open, onOpenChange, lists, finalFocus }: SidebarProps) {
+function resolveDisplayName(user: User): string {
+  return (
+    user.user_metadata?.display_name ??
+    user.user_metadata?.full_name ??
+    user.user_metadata?.name ??
+    user.email?.split('@')[0] ??
+    'User'
+  )
+}
+
+interface ProfileSectionProps {
+  user: User
+  onOpenChange: (open: boolean) => void
+}
+
+function ProfileSection({ user, onOpenChange }: ProfileSectionProps) {
+  const [editOpen, setEditOpen] = useState(false)
+  const [editName, setEditName] = useState('')
+  const [avatarError, setAvatarError] = useState(false)
+  const authError = useAuthStore((state) => state.error)
+
+  const avatarUrl = user.user_metadata?.avatar_url ?? user.user_metadata?.picture ?? null
+  const resolvedDisplayName = resolveDisplayName(user)
+
+  function handleEditOpen() {
+    setEditName(resolvedDisplayName)
+    setEditOpen(true)
+  }
+
+  async function handleSave() {
+    await useAuthStore.getState().updateDisplayName(editName)
+    const currentError = useAuthStore.getState().error
+    if (!currentError) {
+      setEditOpen(false)
+    }
+  }
+
+  async function handleSignOut() {
+    onOpenChange(false)
+    await useAuthStore.getState().signOut()
+  }
+
+  return (
+    <>
+      {editOpen ? (
+        <div className="flex items-center gap-2">
+          <Input
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSave()
+              if (e.key === 'Escape') setEditOpen(false)
+            }}
+            aria-label="Display name"
+            autoFocus
+            className="h-8 text-sm flex-1"
+          />
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={!editName.trim()}
+            onClick={handleSave}
+          >
+            Save name
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setEditOpen(false)}>
+            Cancel
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-3 mb-2 min-h-[44px]">
+          {avatarUrl && !avatarError ? (
+            <img
+              src={avatarUrl}
+              alt={resolvedDisplayName}
+              className="h-10 w-10 rounded-full object-cover shrink-0"
+              referrerPolicy="no-referrer"
+              onError={() => setAvatarError(true)}
+            />
+          ) : (
+            <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-sm font-semibold shrink-0 text-muted-foreground">
+              {resolvedDisplayName.charAt(0).toUpperCase()}
+            </div>
+          )}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="flex-1 truncate text-sm text-sidebar-foreground">
+              {resolvedDisplayName}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Edit display name"
+              onClick={handleEditOpen}
+            >
+              <Pencil className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+      {authError && editOpen && (
+        <p className="text-xs text-destructive mt-1">Could not save name. Try again.</p>
+      )}
+      <Button
+        variant="ghost"
+        className="mt-2 w-full min-h-[44px] justify-start text-sm text-destructive"
+        onClick={handleSignOut}
+        aria-label="Sign out"
+      >
+        Sign out
+      </Button>
+    </>
+  )
+}
+
+export default function Sidebar({ open, onOpenChange, lists, user, finalFocus }: SidebarProps) {
   const match = useMatch('/list/:code')
   const activeCode = match?.params.code ?? null
 
@@ -79,7 +198,9 @@ export default function Sidebar({ open, onOpenChange, lists, finalFocus }: Sideb
           </nav>
 
           {/* Phase 9: profile section (avatar / name / sign-out) mounts here — PROF-01/02/03 */}
-          <div data-slot="profile-slot" className="mt-auto border-t border-sidebar-border p-4" />
+          <div data-slot="profile-slot" className="mt-auto border-t border-sidebar-border p-4">
+            {user && <ProfileSection user={user} onOpenChange={onOpenChange} />}
+          </div>
         </DialogPrimitive.Popup>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>
