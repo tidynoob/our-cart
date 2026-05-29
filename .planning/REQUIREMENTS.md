@@ -16,7 +16,7 @@ Requirements for Accounts & Multi-List milestone. Each maps to roadmap phases.
 ### Profile
 
 - [ ] **PROF-01**: User can edit their display name
-- [ ] **PROF-02**: User's Google avatar displays in sidebar and item attribution
+- [x] **PROF-02**: User's Google avatar displays in sidebar and item attribution
 - [ ] **PROF-03**: User can sign out
 
 ### List Management
@@ -29,7 +29,7 @@ Requirements for Accounts & Multi-List milestone. Each maps to roadmap phases.
 
 - [x] **NAV-01**: User can open a slide-in sidebar showing all their lists
 - [x] **NAV-02**: Currently viewed list is visually highlighted in sidebar
-- [ ] **NAV-03**: User can re-expand the dismissed share code header
+- [x] **NAV-03**: User can re-expand the dismissed share code header
 
 ### Sharing
 
@@ -84,9 +84,9 @@ Which phases cover which requirements. Updated during roadmap creation.
 | NAV-01 | Phase 8 | Complete |
 | NAV-02 | Phase 8 | Complete |
 | PROF-01 | Phase 9 | Pending |
-| PROF-02 | Phase 9 | Pending |
+| PROF-02 | Phase 9 | Complete |
 | PROF-03 | Phase 9 | Pending |
-| NAV-03 | Phase 9 | Pending |
+| NAV-03 | Phase 9 | Complete |
 | SHARE-01 | Phase 10 | Pending |
 | SHARE-02 | Phase 10 | Pending |
 
