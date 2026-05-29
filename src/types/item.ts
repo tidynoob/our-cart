@@ -10,5 +10,6 @@ export interface Item {
   category: string | null
   checked: boolean
   added_by: string | null
+  user_id: string | null
   created_at: string
 }
