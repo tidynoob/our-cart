@@ -27,6 +27,9 @@ interface ItemRowProps {
   onCancelEdit: () => void
   onSave: (id: string, changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>) => void
   onToggle: (id: string) => void
+  currentUserId?: string | null
+  currentUserDisplayName?: string
+  currentUserAvatarUrl?: string | null
 }
 
 /**
@@ -59,6 +62,9 @@ export function ItemRow({
   onCancelEdit,
   onSave,
   onToggle,
+  currentUserId,
+  currentUserDisplayName,
+  currentUserAvatarUrl,
 }: ItemRowProps) {
   const rowRef = useRef<HTMLDivElement>(null)
   const selectOpenRef = useRef(false)
@@ -249,16 +255,29 @@ export function ItemRow({
       </div>
 
       {/* Attribution badge (position unchanged per D-02) */}
-      {item.added_by ? (
-        <AttributionBadge name={item.added_by} />
-      ) : (
-        <div
-          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground"
-          aria-label="Unknown person added this"
-        >
-          ?
-        </div>
-      )}
+      {/* D-06: own item → live name + avatar; else frozen added_by → initials; else "?" */}
+      {(() => {
+        const isOwnItem = item.user_id != null && item.user_id === currentUserId
+        if (isOwnItem) {
+          return (
+            <AttributionBadge
+              name={currentUserDisplayName ?? item.added_by ?? '?'}
+              avatarUrl={currentUserAvatarUrl ?? undefined}
+            />
+          )
+        }
+        if (item.added_by) {
+          return <AttributionBadge name={item.added_by} />
+        }
+        return (
+          <div
+            className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-semibold text-muted-foreground"
+            aria-label="Unknown person added this"
+          >
+            ?
+          </div>
+        )
+      })()}
 
       {/* Name — conditional strikethrough per D-05 */}
       <span className={cn('flex-1 text-base', item.checked && 'line-through')}>

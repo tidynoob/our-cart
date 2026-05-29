@@ -77,6 +77,7 @@ const baseItem: Item = {
   category: 'Dairy',
   checked: false,
   added_by: 'Alice',
+  user_id: null,
   created_at: new Date().toISOString(),
 }
 
@@ -152,5 +153,52 @@ describe('ItemRow tap targets', () => {
     const trigger = document.querySelector('[data-slot="select-trigger"]')
     expect(trigger).not.toBeNull()
     expect(trigger!.className).toContain('h-11')
+  })
+})
+
+describe('ItemRow — attribution (PROF-02/D-06)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('own item: shows live display name and avatar when user_id matches currentUserId (PROF-02/D-04)', () => {
+    const ownItem: Item = { ...baseItem, user_id: 'user-1' }
+    render(
+      <ItemRow
+        {...defaultProps}
+        item={ownItem}
+        currentUserId="user-1"
+        currentUserDisplayName="Mitchell"
+        currentUserAvatarUrl="https://avatar.url"
+      />
+    )
+    // Own-item path: AttributionBadge gets currentUserDisplayName → aria-label "Mitchell added this"
+    expect(screen.getByLabelText('Mitchell added this')).toBeTruthy()
+  })
+
+  it('non-own item: shows frozen added_by name when user_id differs from currentUserId (D-06)', () => {
+    const otherItem: Item = { ...baseItem, user_id: 'user-2', added_by: 'Alice' }
+    render(
+      <ItemRow
+        {...defaultProps}
+        item={otherItem}
+        currentUserId="user-1"
+      />
+    )
+    // Non-own path: AttributionBadge gets item.added_by → aria-label "Alice added this"
+    expect(screen.getByLabelText('Alice added this')).toBeTruthy()
+  })
+
+  it('null user_id: falls back to added_by branch (D-06 case 2)', () => {
+    const nullUserItem: Item = { ...baseItem, user_id: null, added_by: 'Alice' }
+    render(
+      <ItemRow
+        {...defaultProps}
+        item={nullUserItem}
+        currentUserId="user-1"
+      />
+    )
+    // user_id is null → isOwnItem is false → added_by branch
+    expect(screen.getByLabelText('Alice added this')).toBeTruthy()
   })
 })
