@@ -7,6 +7,8 @@ const {
   mockOnAuthStateChange,
   mockSignInWithOAuth,
   mockSignOut,
+  mockUpdateUser,
+  mockGetUser,
   mockSetAuth,
   captureCallback,
   resetCapturedCb,
@@ -21,6 +23,8 @@ const {
     }),
     mockSignInWithOAuth: vi.fn(),
     mockSignOut: vi.fn(),
+    mockUpdateUser: vi.fn(),
+    mockGetUser: vi.fn(),
     mockSetAuth: vi.fn(),
     captureCallback: () => _capturedCb,
     resetCapturedCb: () => { _capturedCb = null },
@@ -34,6 +38,8 @@ vi.mock('@/lib/supabase', () => ({
       onAuthStateChange: mockOnAuthStateChange,
       signInWithOAuth: mockSignInWithOAuth,
       signOut: mockSignOut,
+      updateUser: mockUpdateUser,
+      getUser: mockGetUser,
     },
     realtime: { setAuth: mockSetAuth },
   },
@@ -169,5 +175,70 @@ describe('authStore — signInWithGoogle', () => {
     await useAuthStore.getState().signInWithGoogle()
 
     expect(useAuthStore.getState().error).toBe('OAuth provider error')
+  })
+})
+
+describe('authStore — updateDisplayName', () => {
+  const originalUser = {
+    id: 'user-1',
+    email: 'alice@example.com',
+    user_metadata: { full_name: 'Alice Smith', avatar_url: 'https://example.com/avatar.jpg' },
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useAuthStore.setState({
+      user: originalUser as unknown as import('@supabase/supabase-js').User,
+      session: null,
+      isLoading: false,
+      error: null,
+    })
+  })
+
+  it('trims the name and calls supabase.auth.updateUser with display_name (PROF-01)', async () => {
+    mockUpdateUser.mockResolvedValue({ error: null })
+
+    await useAuthStore.getState().updateDisplayName('  Alice  ')
+
+    expect(mockUpdateUser).toHaveBeenCalledWith({ data: { display_name: 'Alice' } })
+  })
+
+  it('optimistically updates user.user_metadata.display_name before server responds (PROF-01)', async () => {
+    let resolveUpdate!: (value: { error: null }) => void
+    mockUpdateUser.mockReturnValue(new Promise((resolve) => { resolveUpdate = resolve }))
+
+    const promise = useAuthStore.getState().updateDisplayName('Alice')
+
+    // Check optimistic update is in place before server responds
+    expect(useAuthStore.getState().user?.user_metadata.display_name).toBe('Alice')
+
+    resolveUpdate({ error: null })
+    await promise
+  })
+
+  it('does nothing when called with empty string (trim guard)', async () => {
+    await useAuthStore.getState().updateDisplayName('')
+
+    expect(mockUpdateUser).not.toHaveBeenCalled()
+  })
+
+  it('does nothing when called with whitespace-only string (trim guard)', async () => {
+    await useAuthStore.getState().updateDisplayName('   ')
+
+    expect(mockUpdateUser).not.toHaveBeenCalled()
+  })
+
+  it('rolls back to server value and sets error on supabase error (PROF-01)', async () => {
+    const serverUser = {
+      ...originalUser,
+      user_metadata: { ...originalUser.user_metadata, display_name: 'Alice Server' },
+    }
+    mockUpdateUser.mockResolvedValue({ error: { message: 'update failed' } })
+    mockGetUser.mockResolvedValue({ data: { user: serverUser } })
+
+    await useAuthStore.getState().updateDisplayName('Alice Bad')
+
+    expect(useAuthStore.getState().user).toEqual(serverUser)
+    expect(useAuthStore.getState().error).toBe('update failed')
   })
 })
