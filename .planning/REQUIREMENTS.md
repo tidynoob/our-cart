@@ -9,9 +9,9 @@ Requirements for Accounts & Multi-List milestone. Each maps to roadmap phases.
 
 ### Authentication
 
-- [ ] **AUTH-01**: User can sign in with Google OAuth (one-tap)
-- [ ] **AUTH-02**: User session persists across browser refresh and close
-- [ ] **AUTH-03**: Unauthenticated users are redirected to login page
+- [x] **AUTH-01**: User can sign in with Google OAuth (one-tap)
+- [x] **AUTH-02**: User session persists across browser refresh and close
+- [x] **AUTH-03**: Unauthenticated users are redirected to login page
 
 ### Profile
 
@@ -21,9 +21,9 @@ Requirements for Accounts & Multi-List milestone. Each maps to roadmap phases.
 
 ### List Management
 
-- [ ] **LIST-01**: User can create a new named list
-- [ ] **LIST-02**: User can rename an existing list
-- [ ] **LIST-03**: User can delete a list (with confirmation dialog)
+- [x] **LIST-01**: User can create a new named list
+- [x] **LIST-02**: User can rename an existing list
+- [x] **LIST-03**: User can delete a list (with confirmation dialog)
 
 ### Navigation
 
@@ -75,12 +75,12 @@ Which phases cover which requirements. Updated during roadmap creation.
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| AUTH-01 | Phase 6 | Pending |
-| AUTH-02 | Phase 6 | Pending |
-| AUTH-03 | Phase 6 | Pending |
-| LIST-01 | Phase 7 | Pending |
-| LIST-02 | Phase 7 | Pending |
-| LIST-03 | Phase 7 | Pending |
+| AUTH-01 | Phase 6 | Satisfied |
+| AUTH-02 | Phase 6 | Satisfied |
+| AUTH-03 | Phase 6 | Satisfied |
+| LIST-01 | Phase 7 | Complete |
+| LIST-02 | Phase 7 | Complete |
+| LIST-03 | Phase 7 | Complete |
 | NAV-01 | Phase 8 | Pending |
 | NAV-02 | Phase 8 | Pending |
 | PROF-01 | Phase 9 | Pending |
