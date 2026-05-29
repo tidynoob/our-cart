@@ -1,19 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import CreateListForm from './CreateListForm'
+import { useAuthStore } from '@/stores/authStore'
+import { useListsStore } from '@/stores/listsStore'
 
-const mockInsert = vi.fn()
-const mockFrom = vi.fn()
+const mockCreateList = vi.fn()
 const mockNavigate = vi.fn()
 
+// D-04: CreateListForm delegates list creation (owner_id + share_code) to
+// listsStore.createList. It no longer touches the Supabase client directly.
+vi.mock('@/stores/listsStore', () => ({
+  useListsStore: vi.fn(),
+}))
+
+// authStore is the real store (for setState), but it imports the Supabase client
+// at module load — stub the client so the realtime Web Worker never initializes in jsdom.
 vi.mock('@/lib/supabase', () => ({
   supabase: {
-    from: (table: string) => {
-      mockFrom(table)
-      return {
-        insert: mockInsert,
-      }
+    auth: {
+      onAuthStateChange: vi.fn().mockReturnValue({
+        data: { subscription: { unsubscribe: vi.fn() } },
+      }),
+      signInWithOAuth: vi.fn(),
+      signOut: vi.fn(),
     },
+    realtime: { setAuth: vi.fn() },
   },
 }))
 
@@ -28,37 +39,45 @@ vi.mock('react-router-dom', async () => {
 describe('CreateListForm', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Component reads `state.createList` via selector — apply the selector to a fake state.
+    ;(useListsStore as unknown as ReturnType<typeof vi.fn>).mockImplementation(
+      (selector: (s: { createList: typeof mockCreateList }) => unknown) =>
+        selector({ createList: mockCreateList }),
+    )
+    // Real auth store — component reads `state.user` and passes user.id to createList.
+    useAuthStore.setState({
+      user: { id: 'user-1', email: 'test@example.com' } as never,
+      session: { access_token: 'tok' } as never,
+      isLoading: false,
+      error: null,
+    })
   })
 
-  it('does NOT call supabase.from when name is empty', async () => {
+  it('does NOT call createList when name is empty', () => {
     render(<CreateListForm />)
     const button = screen.getByRole('button', { name: /create list/i })
     fireEvent.click(button)
-    // No async wait needed — validation is synchronous
-    expect(mockFrom).not.toHaveBeenCalled()
+    // Validation is synchronous — no async wait needed.
+    expect(mockCreateList).not.toHaveBeenCalled()
   })
 
-  it('calls supabase.from("lists").insert with name and an 8-char share code', async () => {
-    mockInsert.mockResolvedValueOnce({ error: null })
+  it('delegates to createList with the trimmed name and the current user id', async () => {
+    mockCreateList.mockResolvedValueOnce('abcd1234')
 
     render(<CreateListForm />)
     const input = screen.getByLabelText(/list name/i)
-    fireEvent.change(input, { target: { value: 'My List' } })
+    fireEvent.change(input, { target: { value: '  My List  ' } })
 
     const button = screen.getByRole('button', { name: /create list/i })
     fireEvent.click(button)
 
     await waitFor(() => {
-      expect(mockFrom).toHaveBeenCalledWith('lists')
-      expect(mockInsert).toHaveBeenCalledWith({
-        name: 'My List',
-        share_code: expect.stringMatching(/^[A-Za-z0-9_-]{8}$/),
-      })
+      expect(mockCreateList).toHaveBeenCalledWith('My List', 'user-1')
     })
   })
 
-  it('navigates to /list/<8-char-code> after successful INSERT', async () => {
-    mockInsert.mockResolvedValueOnce({ error: null })
+  it('navigates to /list/<share-code> returned by createList after success', async () => {
+    mockCreateList.mockResolvedValueOnce('abcd1234')
 
     render(<CreateListForm />)
     const input = screen.getByLabelText(/list name/i)
@@ -68,16 +87,12 @@ describe('CreateListForm', () => {
     fireEvent.click(button)
 
     await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith(
-        expect.stringMatching(/^\/list\/[A-Za-z0-9_-]{8}$/),
-      )
+      expect(mockNavigate).toHaveBeenCalledWith('/list/abcd1234')
     })
   })
 
-  it('renders "Could not create list" text on Supabase error — does not expose raw error', async () => {
-    mockInsert.mockResolvedValueOnce({
-      error: { message: 'duplicate key value violates unique constraint' },
-    })
+  it('renders generic "Could not create list" text when createList returns no share code', async () => {
+    mockCreateList.mockResolvedValueOnce(null)
 
     render(<CreateListForm />)
     const input = screen.getByLabelText(/list name/i)
@@ -90,9 +105,7 @@ describe('CreateListForm', () => {
       expect(screen.getByText(/could not create list/i)).toBeTruthy()
     })
 
-    // Raw Supabase error must NOT appear
-    expect(
-      screen.queryByText(/duplicate key value/i),
-    ).toBeNull()
+    // No navigation on failure.
+    expect(mockNavigate).not.toHaveBeenCalled()
   })
 })
