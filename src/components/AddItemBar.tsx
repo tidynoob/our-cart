@@ -18,11 +18,6 @@ import type { SuggestionItem } from '@/components/AutocompleteSuggestions'
 interface AddItemBarProps {
   listId: string
   addedBy: string
-  /**
-   * When true, the form is inert (e.g., before the user's name is set).
-   * Prevents creating anonymous items if the name prompt is bypassed (WR-04).
-   */
-  disabled?: boolean
 }
 
 /**
@@ -34,7 +29,7 @@ interface AddItemBarProps {
  * Per review: category dropdown shows SELECTABLE_CATEGORIES only (no Uncategorized).
  * Per review: all text inputs are 16px+ (text-base) to prevent iOS zoom.
  */
-export function AddItemBar({ listId, addedBy, disabled = false }: AddItemBarProps) {
+export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
   const addItem = useItemsStore((state) => state.addItem)
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState('')
@@ -115,9 +110,8 @@ export function AddItemBar({ listId, addedBy, disabled = false }: AddItemBarProp
     setFocusedIndex(-1)
   }
 
-  // The form is inert while submitting or while externally disabled
-  // (e.g., before the user's name is set — WR-04).
-  const isInert = submitting || disabled
+  // The form is inert while submitting — prevents double-submit.
+  const isInert = submitting
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()

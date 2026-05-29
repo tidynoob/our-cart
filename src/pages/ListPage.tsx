@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Menu, Pencil, Trash2 } from 'lucide-react'
+import { Menu, Pencil, Share2, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useUIStore } from '@/stores/uiStore'
 import { useItemsStore } from '@/stores/itemsStore'
@@ -8,8 +8,8 @@ import { useListsStore } from '@/stores/listsStore'
 import { useAuthStore } from '@/stores/authStore'
 import { groupItemsByCategory } from '@/lib/categories'
 import type { Item } from '@/types/item'
+import type { User } from '@supabase/supabase-js'
 import { ShareBanner } from '@/components/ShareBanner'
-import { NamePromptDialog } from '@/components/NamePromptDialog'
 import { AddItemBar } from '@/components/AddItemBar'
 import { CategorySection } from '@/components/CategorySection'
 import { SyncStatus } from '@/components/SyncStatus'
@@ -39,10 +39,10 @@ export default function ListPage() {
   const navigate = useNavigate()
   const dismissedBanners = useUIStore((state) => state.dismissedBanners)
   const dismissBanner = useUIStore((state) => state.dismissBanner)
+  const restoreBanner = useUIStore((state) => state.restoreBanner)
   const [list, setList] = useState<List | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [userName, setUserName] = useState<string | null>(null)
 
   // Edit/delete state managed locally in ListPage (not Zustand)
   // Per review: these are ephemeral UI state for this page only
@@ -124,11 +124,6 @@ export default function ListPage() {
     // then calls fetchItems internally on SUBSCRIBED (D-06). No separate fetchItems() call here.
     const { subscribeToList: subscribe } = useItemsStore.getState()
     subscribe(list.id)
-
-    const savedUserName = localStorage.getItem(`our-cart-name-${list.id}`)
-    if (savedUserName) {
-      setUserName(savedUserName)
-    }
 
     // D-07: belt-and-suspenders for mobile Safari screen-lock reconnect.
     // WR-02 fix: Route through subscribeToList (the full recovery path) instead of
@@ -257,6 +252,17 @@ export default function ListPage() {
     navigate('/')
   }
 
+  /** Resolve a display name from auth user metadata — D-10 / Pitfall 4 / Pitfall 8. */
+  function resolveDisplayName(u: User): string {
+    return (
+      u.user_metadata?.display_name ??
+      u.user_metadata?.full_name ??
+      u.user_metadata?.name ??
+      u.email?.split('@')[0] ??
+      'Unknown'
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
@@ -286,15 +292,6 @@ export default function ListPage() {
           listCode={list.share_code}
           listName={displayName ?? list.name}
           onDismiss={() => dismissBanner(list.share_code)}
-        />
-      )}
-
-      {/* Name prompt dialog — shown when no stored name for this list */}
-      {userName === null && (
-        <NamePromptDialog
-          open={true}
-          listId={list.id}
-          onNameSaved={(name) => setUserName(name)}
         />
       )}
 
@@ -362,13 +359,11 @@ export default function ListPage() {
         </div>
 
         <div className="mt-4 flex flex-col gap-6">
-          {/* Add item bar — disabled until the user's name is set so items
-              can never be created anonymously if the name prompt is
-              bypassed (WR-04). */}
+          {/* Add item bar — always active for authenticated users (D-10).
+              addedBy comes from auth display name via resolveDisplayName(). */}
           <AddItemBar
             listId={list.id}
-            addedBy={userName || ''}
-            disabled={userName === null}
+            addedBy={resolveDisplayName(user!)}
           />
 
           {/* Items loading state */}

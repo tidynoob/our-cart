@@ -249,6 +249,23 @@ describe('AddItemBar auto-expand on suggestion selection', () => {
   })
 })
 
+describe('AddItemBar D-10 — always active for authenticated users', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockSuggestionData = []
+  })
+
+  it('AddItemBar is never disabled for authenticated users (D-10)', async () => {
+    render(<AddItemBar listId="list-1" addedBy="Alice" />)
+
+    const submitButton = screen.getByRole('button', { name: 'Add item' })
+    expect((submitButton as HTMLButtonElement).disabled).toBe(false)
+
+    const input = screen.getByPlaceholderText('Add an item...')
+    expect((input as HTMLInputElement).disabled).toBe(false)
+  })
+})
+
 describe('AddItemBar tap targets', () => {
   beforeEach(() => {
     vi.clearAllMocks()
