@@ -10,6 +10,7 @@ export interface AuthState {
   initialize: () => () => void
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
+  updateDisplayName: (name: string) => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>()((set) => ({
@@ -58,5 +59,28 @@ export const useAuthStore = create<AuthState>()((set) => ({
   signOut: async () => {
     const { error } = await supabase.auth.signOut()
     if (error) set({ error: error.message })
+  },
+
+  // CRITICAL: Do NOT call updateDisplayName from inside onAuthStateChange.
+  // The USER_UPDATED event will re-fire the callback with the server-confirmed
+  // user, producing an idempotent second set() — this is correct behavior.
+  updateDisplayName: async (name: string) => {
+    const trimmed = name.trim()
+    if (!trimmed) return
+
+    // Optimistic update before server responds
+    set((state) => ({
+      user: state.user
+        ? { ...state.user, user_metadata: { ...state.user.user_metadata, display_name: trimmed } }
+        : null,
+      error: null,
+    }))
+
+    const { error } = await supabase.auth.updateUser({ data: { display_name: trimmed } })
+    if (error) {
+      // Rollback: re-fetch server state
+      const { data: { user } } = await supabase.auth.getUser()
+      set({ user, error: error.message })
+    }
   },
 }))
