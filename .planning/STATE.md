@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Accounts & Multi-List
 status: executing
-last_updated: "2026-05-30T17:31:41.676Z"
+last_updated: "2026-05-30T17:34:42.411Z"
 last_activity: 2026-05-30
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 23
-  completed_plans: 21
+  completed_plans: 22
   percent: 80
 ---
 
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 ## Current Position
 
 Phase: 10 (List Sharing) — EXECUTING
-Plan: 4 of 6
+Plan: 5 of 6
 Status: Ready to execute
 Last activity: 2026-05-30
 
@@ -55,6 +55,7 @@ Phase 10: List Sharing         [ ] Not started
 | Phase 10-list-sharing P00 | 5 | 2 tasks | 2 files |
 | Phase 10-list-sharing P01 | 15 | 3 tasks | 3 files |
 | Phase 10 P03 | 99 | 2 tasks | 3 files |
+| Phase 10-list-sharing P04 | 2 | 2 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -98,7 +99,7 @@ Phase 10: List Sharing         [ ] Not started
 
 ## Session Continuity
 
-Last session: 2026-05-30T17:31:41.671Z
+Last session: 2026-05-30T17:34:32.598Z
 Stopped at: Completed 10-01-PLAN.md — SQL migrations for membership model
 Resume file: None
 Next action: `/gsd-plan-phase 6`
@@ -113,3 +114,5 @@ Next action: `/gsd-plan-phase 6`
 - [Phase ?]: D-01: list_members composite PK (list_id, user_id) as idempotency layer 1 for membership
 - [Phase ?]: D-02: SECURITY DEFINER is_list_member avoids RLS recursion; list_members own policies use direct column check only
 - [Phase ?]: D-04: redeem_invite inserts auth.uid() only, never caller-supplied user_id, with ON CONFLICT DO NOTHING idempotency
+- [Phase ?]: D-05: ShareBanner uses /invite/:code URL so partners receive redemption flow not blocked ListPage
+- [Phase ?]: D-08: fetchLists drops owner_id filter; RLS membership policy gates rows; userId param kept as _userId for API compatibility
