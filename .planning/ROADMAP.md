@@ -158,7 +158,7 @@ Plans:
 Plans:
 **Wave 0**
 
-- [ ] 10-00-PLAN.md — Wave 0 test stubs: InvitePage.test.tsx (SHARE-02) + ShareBanner.test.tsx /invite/ assertion (SHARE-02)
+- [x] 10-00-PLAN.md — Wave 0 test stubs: InvitePage.test.tsx (SHARE-02) + ShareBanner.test.tsx /invite/ assertion (SHARE-02)
 
 **Wave 1** *(blocked on Wave 0 completion)*
 
@@ -190,7 +190,7 @@ Plans:
 | 7. Lists Infrastructure | v2.0 | 4/4 | Complete   | 2026-05-29 |
 | 8. App Shell & Sidebar | v2.0 | 3/3 | Complete   | 2026-05-29 |
 | 9. Auth Integration into ListPage | v2.0 | 5/5 | Complete   | 2026-05-29 |
-| 10. List Sharing | v2.0 | 0/6 | Not started | - |
+| 10. List Sharing | v2.0 | 1/6 | In Progress|  |
 
 ---
 *Roadmap created: 2026-05-24*
