@@ -153,7 +153,29 @@ Plans:
   2. A partner who opens the invite link and signs in is added to the list and can see its items
   3. The invite link is stable — sharing it multiple times leads to the same list, not duplicate memberships
 
-**Plans**: TBD
+**Plans**: 6 plans
+
+Plans:
+**Wave 0**
+
+- [ ] 10-00-PLAN.md — Wave 0 test stubs: InvitePage.test.tsx (SHARE-02) + ShareBanner.test.tsx /invite/ assertion (SHARE-02)
+
+**Wave 1** *(blocked on Wave 0 completion)*
+
+- [ ] 10-01-PLAN.md — SQL migrations: list_members table + is_list_member helper + lists/items RLS rewrites + redeem_invite function (SHARE-01, SHARE-02)
+
+**Wave 2 [BLOCKING]** *(blocked on Wave 1 completion)*
+
+- [ ] 10-02-PLAN.md — supabase db push + human schema verification checkpoint (SHARE-01)
+
+**Wave 3** *(blocked on Wave 2 completion — parallel)*
+
+- [ ] 10-03-PLAN.md — InvitePage.tsx component + /invite/:code router registration + activate InvitePage tests (SHARE-02)
+- [ ] 10-04-PLAN.md — ShareBanner URL repoint to /invite/ (D-05) + listsStore fetchLists filter drop (D-08) (SHARE-01, SHARE-02)
+
+**Wave 4** *(blocked on Wave 3 completion)*
+
+- [ ] 10-05-PLAN.md — Full unit suite gate + two-browser manual UAT (7 scenarios) (SHARE-01, SHARE-02)
 
 ## Progress
 
@@ -168,7 +190,7 @@ Plans:
 | 7. Lists Infrastructure | v2.0 | 4/4 | Complete   | 2026-05-29 |
 | 8. App Shell & Sidebar | v2.0 | 3/3 | Complete   | 2026-05-29 |
 | 9. Auth Integration into ListPage | v2.0 | 5/5 | Complete   | 2026-05-29 |
-| 10. List Sharing | v2.0 | 0/? | Not started | - |
+| 10. List Sharing | v2.0 | 0/6 | Not started | - |
 
 ---
 *Roadmap created: 2026-05-24*
@@ -178,3 +200,4 @@ Plans:
 *Phase 7 planned: 2026-05-28*
 *Phase 8 planned: 2026-05-29*
 *Phase 9 planned: 2026-05-29*
+*Phase 10 planned: 2026-05-30*
