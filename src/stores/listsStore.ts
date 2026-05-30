@@ -19,13 +19,13 @@ export const useListsStore = create<ListsState>()((set, get) => ({
   loading: false,
   error: null,
 
-  fetchLists: async (userId) => {
+  fetchLists: async (_userId) => {
+    // _userId kept for API compatibility — RLS now handles access filtering (D-08)
     set({ loading: true, error: null })
 
     const { data, error } = await supabase
       .from('lists')
       .select('id, name, share_code, owner_id, created_at')
-      .eq('owner_id', userId)
       .order('created_at', { ascending: false })
 
     if (error) {

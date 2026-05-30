@@ -34,8 +34,9 @@ describe('listsStore — CRUD actions', () => {
     useListsStore.setState({ lists: [], loading: false, error: null })
   })
 
-  it('fetchLists queries supabase.from("lists") with owner_id filter (LIST-01)', async () => {
-    // fetchLists chain: .from('lists').select().eq('owner_id', userId).order(...)
+  it('fetchLists queries supabase.from("lists") with no owner_id filter — RLS gates rows (D-08, LIST-01)', async () => {
+    // fetchLists chain: .from('lists').select().order(...)
+    // .eq('owner_id') removed — RLS now handles access filtering (D-08)
     // mockOrder is the terminal call for fetchLists
     mockOrder.mockResolvedValueOnce({
       data: [
@@ -47,7 +48,7 @@ describe('listsStore — CRUD actions', () => {
     await useListsStore.getState().fetchLists('u1')
 
     expect(mockFrom).toHaveBeenCalledWith('lists')
-    expect(mockEq).toHaveBeenCalledWith('owner_id', 'u1')
+    expect(mockEq).not.toHaveBeenCalledWith('owner_id', 'u1')
     expect(useListsStore.getState().lists).toHaveLength(1)
   })
 
