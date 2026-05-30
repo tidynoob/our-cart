@@ -48,6 +48,9 @@ describe('ShareBanner', () => {
       expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
         expect.stringContaining('ABC12345'),
       )
+      expect(navigator.clipboard.writeText).toHaveBeenCalledWith(
+        expect.stringContaining('/invite/ABC12345'),
+      )
     })
   })
 
