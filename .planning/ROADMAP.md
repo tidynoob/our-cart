@@ -170,7 +170,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2 completion — parallel)*
 
-- [ ] 10-03-PLAN.md — InvitePage.tsx component + /invite/:code router registration + activate InvitePage tests (SHARE-02)
+- [x] 10-03-PLAN.md — InvitePage.tsx component + /invite/:code router registration + activate InvitePage tests (SHARE-02)
 - [ ] 10-04-PLAN.md — ShareBanner URL repoint to /invite/ (D-05) + listsStore fetchLists filter drop (D-08) (SHARE-01, SHARE-02)
 
 **Wave 4** *(blocked on Wave 3 completion)*
@@ -190,7 +190,7 @@ Plans:
 | 7. Lists Infrastructure | v2.0 | 4/4 | Complete   | 2026-05-29 |
 | 8. App Shell & Sidebar | v2.0 | 3/3 | Complete   | 2026-05-29 |
 | 9. Auth Integration into ListPage | v2.0 | 5/5 | Complete   | 2026-05-29 |
-| 10. List Sharing | v2.0 | 3/6 | In Progress|  |
+| 10. List Sharing | v2.0 | 4/6 | In Progress|  |
 
 ---
 *Roadmap created: 2026-05-24*
