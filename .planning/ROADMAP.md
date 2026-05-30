@@ -162,7 +162,7 @@ Plans:
 
 **Wave 1** *(blocked on Wave 0 completion)*
 
-- [ ] 10-01-PLAN.md — SQL migrations: list_members table + is_list_member helper + lists/items RLS rewrites + redeem_invite function (SHARE-01, SHARE-02)
+- [x] 10-01-PLAN.md — SQL migrations: list_members table + is_list_member helper + lists/items RLS rewrites + redeem_invite function (SHARE-01, SHARE-02)
 
 **Wave 2 [BLOCKING]** *(blocked on Wave 1 completion)*
 
@@ -190,7 +190,7 @@ Plans:
 | 7. Lists Infrastructure | v2.0 | 4/4 | Complete   | 2026-05-29 |
 | 8. App Shell & Sidebar | v2.0 | 3/3 | Complete   | 2026-05-29 |
 | 9. Auth Integration into ListPage | v2.0 | 5/5 | Complete   | 2026-05-29 |
-| 10. List Sharing | v2.0 | 1/6 | In Progress|  |
+| 10. List Sharing | v2.0 | 2/6 | In Progress|  |
 
 ---
 *Roadmap created: 2026-05-24*

@@ -33,7 +33,7 @@ Requirements for Accounts & Multi-List milestone. Each maps to roadmap phases.
 
 ### Sharing
 
-- [ ] **SHARE-01**: User can generate a shareable invite link for a list
+- [x] **SHARE-01**: User can generate a shareable invite link for a list
 - [x] **SHARE-02**: User can access the invite link from a share button in the list header
 
 ## Future Requirements
@@ -87,7 +87,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | PROF-02 | Phase 9 | Complete |
 | PROF-03 | Phase 9 | Complete |
 | NAV-03 | Phase 9 | Complete |
-| SHARE-01 | Phase 10 | Pending |
+| SHARE-01 | Phase 10 | Complete |
 | SHARE-02 | Phase 10 | Complete |
 
 **Coverage:**

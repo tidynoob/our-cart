@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Accounts & Multi-List
 status: executing
-last_updated: "2026-05-30T17:17:56.458Z"
+last_updated: "2026-05-30T17:22:49.440Z"
 last_activity: 2026-05-30
 progress:
   total_phases: 5
   completed_phases: 4
   total_plans: 23
-  completed_plans: 18
-  percent: 78
+  completed_plans: 19
+  percent: 80
 ---
 
 # Project State
@@ -25,7 +25,7 @@ See: .planning/PROJECT.md (updated 2026-05-27)
 ## Current Position
 
 Phase: 10 (List Sharing) — EXECUTING
-Plan: 2 of 6
+Plan: 3 of 6
 Status: Ready to execute
 Last activity: 2026-05-30
 
@@ -53,6 +53,7 @@ Phase 10: List Sharing         [ ] Not started
 | Phase 09 P03 | 15 minutes | 2 tasks | 3 files |
 | Phase 09 P04 | 18 | 3 tasks | 7 files |
 | Phase 10-list-sharing P00 | 5 | 2 tasks | 2 files |
+| Phase 10-list-sharing P01 | 15 | 3 tasks | 3 files |
 
 ## Accumulated Context
 
@@ -96,8 +97,8 @@ Phase 10: List Sharing         [ ] Not started
 
 ## Session Continuity
 
-Last session: 2026-05-30T17:17:56.452Z
-Stopped at: Phase 10 context gathered
+Last session: 2026-05-30T17:22:49.433Z
+Stopped at: Completed 10-01-PLAN.md — SQL migrations for membership model
 Resume file: None
 Next action: `/gsd-plan-phase 6`
 
@@ -108,3 +109,6 @@ Next action: `/gsd-plan-phase 6`
 - [Phase ?]: displayName = storedName ?? list?.name — store cache for live rename, local state fallback for direct URL nav (D-06/D-03)
 - [Phase ?]: ProfileSection extracted as local sub-component; handleSignOut closes drawer before redirect (D-09)
 - [Phase ?]: resolveDisplayName scoped as component-local helper in ListPage (display_name ?? full_name ?? name ?? email.split('@')[0] ?? 'Unknown')
+- [Phase ?]: D-01: list_members composite PK (list_id, user_id) as idempotency layer 1 for membership
+- [Phase ?]: D-02: SECURITY DEFINER is_list_member avoids RLS recursion; list_members own policies use direct column check only
+- [Phase ?]: D-04: redeem_invite inserts auth.uid() only, never caller-supplied user_id, with ON CONFLICT DO NOTHING idempotency
