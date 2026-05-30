@@ -10,8 +10,8 @@ interface ShareBannerProps {
 export function ShareBanner({ listCode, listName, onDismiss }: ShareBannerProps) {
   const [copied, setCopied] = useState(false)
 
-  // Construct the share URL from the browser's current origin (D-05)
-  const shareUrl = `${window.location.origin}/list/${listCode}`
+  // Construct the invite URL — /invite/:code triggers redemption flow (D-05)
+  const shareUrl = `${window.location.origin}/invite/${listCode}`
 
   async function handleCopy() {
     await navigator.clipboard.writeText(shareUrl)
