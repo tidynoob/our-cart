@@ -166,7 +166,7 @@ Plans:
 
 **Wave 2 [BLOCKING]** *(blocked on Wave 1 completion)*
 
-- [ ] 10-02-PLAN.md — supabase db push + human schema verification checkpoint (SHARE-01)
+- [x] 10-02-PLAN.md — supabase db push + human schema verification checkpoint (SHARE-01)
 
 **Wave 3** *(blocked on Wave 2 completion — parallel)*
 
@@ -190,7 +190,7 @@ Plans:
 | 7. Lists Infrastructure | v2.0 | 4/4 | Complete   | 2026-05-29 |
 | 8. App Shell & Sidebar | v2.0 | 3/3 | Complete   | 2026-05-29 |
 | 9. Auth Integration into ListPage | v2.0 | 5/5 | Complete   | 2026-05-29 |
-| 10. List Sharing | v2.0 | 2/6 | In Progress|  |
+| 10. List Sharing | v2.0 | 3/6 | In Progress|  |
 
 ---
 *Roadmap created: 2026-05-24*
