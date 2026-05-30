@@ -1,5 +1,5 @@
 ---
-status: complete
+status: diagnosed
 phase: 10-list-sharing
 source: [10-00-SUMMARY.md, 10-01-SUMMARY.md, 10-02-SUMMARY.md, 10-03-SUMMARY.md, 10-04-SUMMARY.md]
 started: 2026-05-30T21:37:44Z
@@ -54,7 +54,16 @@ blocked: 0
   reason: "User reported: lists are loading, but both my gmail accounts can see all the lists from supabase that have null owner_id"
   severity: major
   test: 1
-  root_cause: ""     # Filled by diagnosis
-  artifacts: []      # Filled by diagnosis
-  missing: []        # Filled by diagnosis
-  debug_session: ""  # Filled by diagnosis
+  root_cause: "lists_select RLS policy leads with an unconditional `owner_id IS NULL` branch (no auth.uid() scope), granting every authenticated caller SELECT on all null-owner rows. D-08 removed the app-side .eq('owner_id') filter that previously masked it, so RLS is now the sole gate and the legacy null-owner lists leak across accounts. Same branch present in lists_update/lists_delete and all four items policies (secondary item leak)."
+  artifacts:
+    - path: "supabase/migrations/lists_membership.sql"
+      issue: "lines 22-26 (also update:38, delete:58) — unconditional `owner_id IS NULL` branch in USING clause"
+    - path: "supabase/migrations/items_membership.sql"
+      issue: "lines 30,40,50,55,65 — same null-owner branch leaks items on exposed lists"
+    - path: "src/stores/listsStore.ts"
+      issue: "lines 22-36 — D-08 removed app-side owner filter that masked the latent policy flaw (not buggy itself; unmasked it)"
+  missing:
+    - "Drop the unconditional `owner_id IS NULL` branch from lists_select/update/delete and all four items policies"
+    - "Backfill owner_id on legacy null-owner rows (assign to correct account) OR scope legacy lists via is_list_member membership rows instead of an open IS NULL grant"
+    - "Re-apply migrations to live Supabase and re-verify both accounts see only their own + member lists"
+  debug_session: ".planning/debug/null-owner-list-leak.md"
