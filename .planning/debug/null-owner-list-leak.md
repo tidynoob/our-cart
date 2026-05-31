@@ -1,9 +1,10 @@
 ---
-status: diagnosed
+status: resolved
 trigger: "lists are loading, but both my gmail accounts can see all the lists from supabase that have null owner_id"
 created: 2026-05-30T22:00:00Z
-updated: 2026-05-30T22:05:00Z
+updated: 2026-05-30T22:40:00Z
 goal: find_root_cause_only
+resolved_by: .planning/phases/10-list-sharing/10-06-SUMMARY.md
 ---
 
 ## Current Focus
@@ -70,6 +71,16 @@ root_cause: |
   null-owner lists across all authenticated accounts. The same `owner_id IS NULL` branch
   exists in the items policies (items_membership.sql:30,40,50,55,65), so items on those
   leaked lists are exposed too.
-fix: ""   # not applied — find_root_cause_only mode
-verification: ""
-files_changed: []
+fix: |
+  10-06 gap closure. Removed the unconditional `owner_id IS NULL` branch from every
+  lists/items SELECT/UPDATE/DELETE RLS clause (lists_membership.sql, items_membership.sql).
+  Every surviving branch scopes by (select auth.uid()) or is_list_member. Live DB: deleted
+  11 stale null-owner test lists + 13 items first (human-gated), then applied corrected
+  policies via MCP.
+verification: |
+  pg_policies shows zero `owner_id IS NULL` in lists/items policy quals. Per-account RLS
+  impersonation: each Gmail account sees only its own + explicitly-shared lists, neither sees
+  the other's private list.
+files_changed:
+  - supabase/migrations/lists_membership.sql
+  - supabase/migrations/items_membership.sql

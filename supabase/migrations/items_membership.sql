@@ -1,10 +1,11 @@
 -- Phase 10: List Sharing -- widen items RLS to all items on accessible lists; add redeem_invite
 --
 -- Rewrites all four items policies to grant access to items whose list_id is accessible to
--- the current user (as owner or as a member). Three-branch USING shape:
---   (a) legacy anonymous lists (owner_id IS NULL),
---   (b) lists owned by the current user,
---   (c) lists the current user is a member of (via is_list_member helper).
+-- the current user (as owner or as a member). Two-branch USING shape:
+--   (a) lists owned by the current user,
+--   (b) lists the current user is a member of (via is_list_member helper).
+-- The legacy owner_id IS NULL subselect was removed (10-06 gap closure): it leaked items
+-- on every null-owner list to all callers. Items inherit their list's access scope.
 --
 -- Also adds the redeem_invite SECURITY DEFINER function that handles invite link redemption.
 --
@@ -17,7 +18,7 @@
 -- ============================================================
 -- SECTION 1: Widened items policies
 -- ============================================================
--- All four operations use the same three-branch access shape based on list_id.
+-- All four operations use the same two-branch access shape based on list_id.
 -- Items belong to their list; if you can access the list, you can access its items.
 -- Uses (select auth.uid()) subselect form for initPlan query-planner optimization.
 -- Retains TO anon, authenticated role grants from existing items policies.
@@ -27,8 +28,7 @@ DROP POLICY IF EXISTS "items_select" ON public.items;
 CREATE POLICY "items_select" ON public.items FOR SELECT
   TO anon, authenticated
   USING (
-    list_id IN (SELECT id FROM public.lists WHERE owner_id IS NULL)
-    OR list_id IN (SELECT id FROM public.lists WHERE owner_id = (select auth.uid()))
+    list_id IN (SELECT id FROM public.lists WHERE owner_id = (select auth.uid()))
     OR public.is_list_member(list_id)
   );
 
@@ -37,8 +37,7 @@ DROP POLICY IF EXISTS "items_insert" ON public.items;
 CREATE POLICY "items_insert" ON public.items FOR INSERT
   TO anon, authenticated
   WITH CHECK (
-    list_id IN (SELECT id FROM public.lists WHERE owner_id IS NULL)
-    OR list_id IN (SELECT id FROM public.lists WHERE owner_id = (select auth.uid()))
+    list_id IN (SELECT id FROM public.lists WHERE owner_id = (select auth.uid()))
     OR public.is_list_member(list_id)
   );
 
@@ -47,13 +46,11 @@ DROP POLICY IF EXISTS "items_update" ON public.items;
 CREATE POLICY "items_update" ON public.items FOR UPDATE
   TO anon, authenticated
   USING (
-    list_id IN (SELECT id FROM public.lists WHERE owner_id IS NULL)
-    OR list_id IN (SELECT id FROM public.lists WHERE owner_id = (select auth.uid()))
+    list_id IN (SELECT id FROM public.lists WHERE owner_id = (select auth.uid()))
     OR public.is_list_member(list_id)
   )
   WITH CHECK (
-    list_id IN (SELECT id FROM public.lists WHERE owner_id IS NULL)
-    OR list_id IN (SELECT id FROM public.lists WHERE owner_id = (select auth.uid()))
+    list_id IN (SELECT id FROM public.lists WHERE owner_id = (select auth.uid()))
     OR public.is_list_member(list_id)
   );
 
@@ -62,8 +59,7 @@ DROP POLICY IF EXISTS "items_delete" ON public.items;
 CREATE POLICY "items_delete" ON public.items FOR DELETE
   TO anon, authenticated
   USING (
-    list_id IN (SELECT id FROM public.lists WHERE owner_id IS NULL)
-    OR list_id IN (SELECT id FROM public.lists WHERE owner_id = (select auth.uid()))
+    list_id IN (SELECT id FROM public.lists WHERE owner_id = (select auth.uid()))
     OR public.is_list_member(list_id)
   );
 

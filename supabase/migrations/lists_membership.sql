@@ -1,9 +1,11 @@
 -- Phase 10: List Sharing -- widen lists RLS to owner-OR-member
 --
 -- Rewrites lists SELECT and UPDATE policies to allow access for:
---   (a) anonymous legacy lists (owner_id IS NULL),
---   (b) the authenticated user who owns the list,
---   (c) authenticated users who are members of the list (via is_list_member helper).
+--   (a) the authenticated user who owns the list,
+--   (b) authenticated users who are members of the list (via is_list_member helper).
+-- The legacy owner_id IS NULL branch was removed (10-06 gap closure): it was an
+-- unconditional grant that leaked all null-owner rows to every caller (data isolation
+-- failure). Every branch now scopes by auth.uid() or membership.
 -- DELETE stays owner-only: members may not delete the list.
 -- INSERT policy is unchanged: only owners create lists.
 --
@@ -12,16 +14,14 @@
 -- Idempotent: DROP POLICY IF EXISTS before each CREATE POLICY.
 
 -- ============================================================
--- lists SELECT: widen to owner OR member
+-- lists SELECT: owner OR member
 -- ============================================================
--- Preserves owner_id IS NULL branch for legacy anonymous lists created before Phase 6.
 
 DROP POLICY IF EXISTS "lists_select" ON public.lists;
 CREATE POLICY "lists_select" ON public.lists FOR SELECT
   TO anon, authenticated
   USING (
-    owner_id IS NULL
-    OR (select auth.uid()) = owner_id
+    (select auth.uid()) = owner_id
     OR public.is_list_member(id)
   );
 
@@ -35,13 +35,11 @@ DROP POLICY IF EXISTS "lists_update" ON public.lists;
 CREATE POLICY "lists_update" ON public.lists FOR UPDATE
   TO authenticated
   USING (
-    owner_id IS NULL
-    OR (select auth.uid()) = owner_id
+    (select auth.uid()) = owner_id
     OR public.is_list_member(id)
   )
   WITH CHECK (
-    owner_id IS NULL
-    OR (select auth.uid()) = owner_id
+    (select auth.uid()) = owner_id
     OR public.is_list_member(id)
   );
 
@@ -55,8 +53,7 @@ DROP POLICY IF EXISTS "lists_delete" ON public.lists;
 CREATE POLICY "lists_delete" ON public.lists FOR DELETE
   TO authenticated
   USING (
-    owner_id IS NULL
-    OR (select auth.uid()) = owner_id
+    (select auth.uid()) = owner_id
   );
 
 -- INSERT policy unchanged: only owners create lists.
