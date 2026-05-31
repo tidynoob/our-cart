@@ -13,9 +13,6 @@ interface CategorySectionProps {
   onConfirmDelete: (id: string) => void
   onCancelDelete: () => void
   onToggle: (id: string) => void
-  currentUserId?: string | null
-  currentUserDisplayName?: string
-  currentUserAvatarUrl?: string | null
 }
 
 /**
@@ -38,9 +35,6 @@ export function CategorySection({
   onConfirmDelete,
   onCancelDelete,
   onToggle,
-  currentUserId,
-  currentUserDisplayName,
-  currentUserAvatarUrl,
 }: CategorySectionProps) {
   return (
     <div>
@@ -65,9 +59,6 @@ export function CategorySection({
             onCancelDelete={onCancelDelete}
             onConfirmDelete={() => onConfirmDelete(item.id)}
             onToggle={() => onToggle(item.id)}
-            currentUserId={currentUserId}
-            currentUserDisplayName={currentUserDisplayName}
-            currentUserAvatarUrl={currentUserAvatarUrl}
           />
         ))}
       </div>

@@ -15,6 +15,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import { SELECTABLE_CATEGORIES } from '@/lib/categories'
+import { useProfilesStore } from '@/stores/profilesStore'
 
 interface ItemRowProps {
   item: Item
@@ -27,9 +28,6 @@ interface ItemRowProps {
   onCancelEdit: () => void
   onSave: (id: string, changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>) => void
   onToggle: (id: string) => void
-  currentUserId?: string | null
-  currentUserDisplayName?: string
-  currentUserAvatarUrl?: string | null
 }
 
 /**
@@ -62,10 +60,10 @@ export function ItemRow({
   onCancelEdit,
   onSave,
   onToggle,
-  currentUserId,
-  currentUserDisplayName,
-  currentUserAvatarUrl,
 }: ItemRowProps) {
+  // REACTIVE selector — re-renders when profilesStore.profiles changes (PROF-05 live names)
+  // Do NOT use useProfilesStore.getState().profiles — non-reactive snapshot breaks PROF-05.
+  const profiles = useProfilesStore((state) => state.profiles)
   const rowRef = useRef<HTMLDivElement>(null)
   const selectOpenRef = useRef(false)
   const [editName, setEditName] = useState('')
@@ -254,17 +252,20 @@ export function ItemRow({
         />
       </div>
 
-      {/* Attribution badge (position unchanged per D-02) */}
-      {/* D-06: own item → live name + avatar; else frozen added_by → initials; else "?" */}
+      {/* Attribution badge — reads from profilesStore by item.user_id (D-04/PROF-04)
+          Fallback chain: profile avatar → profile name initials → frozen added_by → "?" */}
       {(() => {
-        const isOwnItem = item.user_id != null && item.user_id === currentUserId
-        if (isOwnItem) {
+        const profile = profiles[item.user_id ?? '']
+        if (profile?.avatar_url) {
           return (
             <AttributionBadge
-              name={currentUserDisplayName ?? item.added_by ?? '?'}
-              avatarUrl={currentUserAvatarUrl ?? undefined}
+              name={profile.display_name ?? item.added_by ?? '?'}
+              avatarUrl={profile.avatar_url}
             />
           )
+        }
+        if (profile?.display_name) {
+          return <AttributionBadge name={profile.display_name} />
         }
         if (item.added_by) {
           return <AttributionBadge name={item.added_by} />

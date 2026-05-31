@@ -2,6 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { ItemRow } from './ItemRow'
 import type { Item } from '@/types/item'
+import { useProfilesStore } from '@/stores/profilesStore'
+
+// Must mock @/lib/supabase before profilesStore module loads (Web Worker not in jsdom)
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: vi.fn().mockReturnValue({ upsert: vi.fn() }),
+    channel: vi.fn().mockReturnValue({
+      on: vi.fn().mockReturnThis(),
+      subscribe: vi.fn().mockReturnValue({}),
+    }),
+    removeChannel: vi.fn(),
+  },
+}))
 
 // Mock @base-ui/react/checkbox to avoid JSDOM issues with Base UI
 vi.mock('@base-ui/react/checkbox', () => ({
@@ -94,6 +107,11 @@ const defaultProps = {
   onToggle: vi.fn(),
 }
 
+/** Seed the profilesStore with test data (reactive selector approach — see context_note in 11-06-PLAN.md) */
+function seedProfiles(profiles: Record<string, { display_name: string | null; avatar_url: string | null }>) {
+  useProfilesStore.setState({ profiles, channel: null })
+}
+
 describe('ItemRow display mode — checked visual state', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -156,49 +174,48 @@ describe('ItemRow tap targets', () => {
   })
 })
 
-describe('ItemRow — attribution (PROF-02/D-06)', () => {
+describe('ItemRow — attribution from profilesStore (PROF-04/PROF-05/D-04)', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // Reset profilesStore to empty before each test
+    useProfilesStore.setState({ profiles: {}, channel: null })
   })
 
-  it('own item: shows live display name and avatar when user_id matches currentUserId (PROF-02/D-04)', () => {
-    const ownItem: Item = { ...baseItem, user_id: 'user-1' }
-    render(
-      <ItemRow
-        {...defaultProps}
-        item={ownItem}
-        currentUserId="user-1"
-        currentUserDisplayName="Mitchell"
-        currentUserAvatarUrl="https://avatar.url"
-      />
-    )
-    // Own-item path: AttributionBadge gets currentUserDisplayName → aria-label "Mitchell added this"
+  it('profile with avatar: shows avatar and profile display_name (PROF-04)', () => {
+    seedProfiles({ 'user-1': { display_name: 'Mitchell', avatar_url: 'https://avatar.url' } })
+    const item: Item = { ...baseItem, user_id: 'user-1' }
+    render(<ItemRow {...defaultProps} item={item} />)
+    // profile.avatar_url present → AttributionBadge with display_name → aria-label "Mitchell added this"
     expect(screen.getByLabelText('Mitchell added this')).toBeTruthy()
   })
 
-  it('non-own item: shows frozen added_by name when user_id differs from currentUserId (D-06)', () => {
-    const otherItem: Item = { ...baseItem, user_id: 'user-2', added_by: 'Alice' }
-    render(
-      <ItemRow
-        {...defaultProps}
-        item={otherItem}
-        currentUserId="user-1"
-      />
-    )
-    // Non-own path: AttributionBadge gets item.added_by → aria-label "Alice added this"
+  it('profile with display_name only (no avatar): shows profile name initials (PROF-04)', () => {
+    seedProfiles({ 'user-2': { display_name: 'Alice', avatar_url: null } })
+    const item: Item = { ...baseItem, user_id: 'user-2', added_by: 'Alice Old' }
+    render(<ItemRow {...defaultProps} item={item} />)
+    // profile.display_name but no avatar → AttributionBadge with display_name
     expect(screen.getByLabelText('Alice added this')).toBeTruthy()
   })
 
-  it('null user_id: falls back to added_by branch (D-06 case 2)', () => {
-    const nullUserItem: Item = { ...baseItem, user_id: null, added_by: 'Alice' }
-    render(
-      <ItemRow
-        {...defaultProps}
-        item={nullUserItem}
-        currentUserId="user-1"
-      />
-    )
-    // user_id is null → isOwnItem is false → added_by branch
+  it('no profile entry: falls back to frozen added_by (D-04 fallback chain)', () => {
+    // profiles map is empty — no entry for this user_id
+    const item: Item = { ...baseItem, user_id: 'unknown-user', added_by: 'Alice' }
+    render(<ItemRow {...defaultProps} item={item} />)
+    // No profile → fallback to item.added_by
     expect(screen.getByLabelText('Alice added this')).toBeTruthy()
+  })
+
+  it('null user_id: falls back to added_by branch (D-04 case — legacy item)', () => {
+    const nullUserItem: Item = { ...baseItem, user_id: null, added_by: 'Alice' }
+    render(<ItemRow {...defaultProps} item={nullUserItem} />)
+    // user_id is null → profiles[''] lookup finds nothing → added_by branch
+    expect(screen.getByLabelText('Alice added this')).toBeTruthy()
+  })
+
+  it('no profile and no added_by: shows ? unknown badge', () => {
+    const unknownItem: Item = { ...baseItem, user_id: null, added_by: null }
+    render(<ItemRow {...defaultProps} item={unknownItem} />)
+    // No profile, no added_by → ? div
+    expect(screen.getByLabelText('Unknown person added this')).toBeTruthy()
   })
 })
