@@ -82,9 +82,10 @@ vi.mock('@/lib/supabase', () => ({
     },
     channel: vi.fn().mockReturnValue({
       on: vi.fn().mockReturnThis(),
-      subscribe: vi.fn().mockImplementation((cb: (status: string) => void) => {
-        // Trigger SUBSCRIBED immediately so tests don't hang waiting for it
-        setTimeout(() => cb('SUBSCRIBED'), 0)
+      subscribe: vi.fn().mockImplementation((cb?: (status: string) => void) => {
+        // Trigger SUBSCRIBED immediately so tests don't hang waiting for it.
+        // Guard: cb may be undefined when subscribe() is called without args (e.g. listChannel).
+        if (cb) setTimeout(() => cb('SUBSCRIBED'), 0)
         return {}
       }),
     }),

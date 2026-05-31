@@ -1,18 +1,21 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Menu, Pencil, Share2, Trash2 } from 'lucide-react'
+import { Menu, Pencil, Share2, Trash2, Users } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useUIStore } from '@/stores/uiStore'
 import { useItemsStore } from '@/stores/itemsStore'
+import { useProfilesStore } from '@/stores/profilesStore'
 import { useListsStore } from '@/stores/listsStore'
 import { useAuthStore } from '@/stores/authStore'
 import { groupItemsByCategory } from '@/lib/categories'
 import type { Item } from '@/types/item'
-import type { User } from '@supabase/supabase-js'
+import { resolveDisplayName } from '@/lib/displayName'
 import { ShareBanner } from '@/components/ShareBanner'
 import { AddItemBar } from '@/components/AddItemBar'
 import { CategorySection } from '@/components/CategorySection'
 import { SyncStatus } from '@/components/SyncStatus'
+import { Spinner } from '@/components/Spinner'
+import MembersDialog from '@/components/MembersDialog'
 import { useSidebarContext } from '@/contexts/SidebarContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -59,6 +62,12 @@ export default function ListPage() {
   // Delete list dialog state — ephemeral UI, not Zustand
   const [deleteListDialogOpen, setDeleteListDialogOpen] = useState(false)
   const [deleteListLoading, setDeleteListLoading] = useState(false)
+
+  // Members dialog state — ephemeral UI, not Zustand
+  const [membersDialogOpen, setMembersDialogOpen] = useState(false)
+
+  // Member removal eject state — set true when current user is removed from list
+  const [removedFromList, setRemovedFromList] = useState(false)
 
   // Auth state — for owner guard (user.id === list.owner_id)
   const user = useAuthStore((state) => state.user)
@@ -125,6 +134,22 @@ export default function ListPage() {
     const { subscribeToList: subscribe } = useItemsStore.getState()
     subscribe(list.id)
 
+    // Load cross-user profiles for attribution (PROF-04) and subscribe to live updates (PROF-05)
+    useProfilesStore.getState().loadForList(list.id)
+
+    // Open list-level Broadcast channel for member_removed eject (MEMBER-01 / D-09)
+    // Topic 'list-{listId}' is distinct from 'items-{listId}' (RESEARCH Pattern 6)
+    const listChannel = supabase
+      .channel(`list-${list.id}`)
+      .on('broadcast', { event: 'member_removed' }, (payload) => {
+        // Only eject if the removed user_id matches the current user (T-11-06-01 spoofing guard)
+        if (payload.payload?.user_id === user?.id) {
+          setRemovedFromList(true)
+          setTimeout(() => navigate('/'), 1500)
+        }
+      })
+      .subscribe()
+
     // D-07: belt-and-suspenders for mobile Safari screen-lock reconnect.
     // WR-02 fix: Route through subscribeToList (the full recovery path) instead of
     // calling fetchItems directly. This consolidates recovery into a single path and
@@ -154,11 +179,13 @@ export default function ListPage() {
 
     return () => {
       useItemsStore.getState().unsubscribe()
+      useProfilesStore.getState().unsubscribe()  // clean up profiles channel (Pitfall 4)
+      supabase.removeChannel(listChannel)          // clean up list Broadcast channel (T-11-06-02)
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('offline', handleOffline)
       window.removeEventListener('online', handleOnline)
     }
-  }, [list]) // Only re-run when the list identity changes
+  }, [list, user, navigate]) // user + navigate added for member_removed handler deps
 
   // --- Edit/Delete Handlers ---
 
@@ -252,21 +279,10 @@ export default function ListPage() {
     navigate('/')
   }
 
-  /** Resolve a display name from auth user metadata — D-10 / Pitfall 4 / Pitfall 8. */
-  function resolveDisplayName(u: User): string {
-    return (
-      u.user_metadata?.display_name ??
-      u.user_metadata?.full_name ??
-      u.user_metadata?.name ??
-      u.email?.split('@')[0] ??
-      'Unknown'
-    )
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <p>Loading...</p>
+        <Spinner />
       </div>
     )
   }
@@ -284,12 +300,6 @@ export default function ListPage() {
 
   const grouped = groupItemsByCategory(items)
 
-  // Current-user attribution values for CategorySection → ItemRow live attribution (D-04/D-06)
-  const currentUserDisplayName = user ? resolveDisplayName(user) : undefined
-  const currentUserAvatarUrl = user
-    ? (user.user_metadata?.avatar_url ?? user.user_metadata?.picture ?? null)
-    : null
-
   return (
     <div className="min-h-screen flex flex-col items-center">
       {/* ShareBanner shown until dismissed (D-04) */}
@@ -299,6 +309,17 @@ export default function ListPage() {
           listName={displayName ?? list.name}
           onDismiss={() => dismissBanner(list.share_code)}
         />
+      )}
+
+      {/* Member removal eject message (MEMBER-01 / D-09) — shown before redirect to '/' */}
+      {removedFromList && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="text-sm text-muted-foreground text-center py-2"
+        >
+          You were removed from this list
+        </div>
       )}
 
       <div className="w-full max-w-md p-4">
@@ -373,6 +394,16 @@ export default function ListPage() {
               <Share2 className="h-4 w-4" />
             </Button>
           )}
+          {/* Members management button (D-07) — visible to all authenticated list members */}
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Manage members"
+            onClick={() => setMembersDialogOpen(true)}
+            className="h-8 w-8 shrink-0"
+          >
+            <Users className="h-4 w-4" />
+          </Button>
         </div>
 
         <div className="mt-4 flex flex-col gap-6">
@@ -385,7 +416,7 @@ export default function ListPage() {
 
           {/* Items loading state */}
           {itemsLoading && (
-            <p className="text-sm text-muted-foreground">Loading items...</p>
+            <Spinner label="Loading items" size="sm" />
           )}
 
           {/* Items error state — covers both load failures and failed
@@ -428,9 +459,6 @@ export default function ListPage() {
               onConfirmDelete={handleConfirmDelete}
               onCancelDelete={handleCancelDelete}
               onToggle={handleToggle}
-              currentUserId={user?.id ?? null}
-              currentUserDisplayName={currentUserDisplayName}
-              currentUserAvatarUrl={currentUserAvatarUrl}
             />
           ))}
 
@@ -508,6 +536,15 @@ export default function ListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Members management dialog (D-07 / MEMBER-01/02) */}
+      <MembersDialog
+        listId={list.id}
+        listName={displayName ?? list.name}
+        ownerId={list.owner_id ?? ''}
+        open={membersDialogOpen}
+        onOpenChange={setMembersDialogOpen}
+      />
     </div>
   )
 }
