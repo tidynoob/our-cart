@@ -1,9 +1,9 @@
 ---
-status: diagnosed
+status: complete
 phase: 10-list-sharing
-source: [10-00-SUMMARY.md, 10-01-SUMMARY.md, 10-02-SUMMARY.md, 10-03-SUMMARY.md, 10-04-SUMMARY.md]
+source: [10-00-SUMMARY.md, 10-01-SUMMARY.md, 10-02-SUMMARY.md, 10-03-SUMMARY.md, 10-04-SUMMARY.md, 10-06-SUMMARY.md]
 started: 2026-05-30T21:37:44Z
-updated: 2026-05-30T21:40:00Z
+updated: 2026-05-31T00:00:00Z
 ---
 
 ## Current Test
@@ -14,9 +14,9 @@ updated: 2026-05-30T21:40:00Z
 
 ### 1. Cold Start Smoke Test
 expected: Kill any running dev server, start fresh, log in. App boots without errors, lists load from Supabase, list page shows live data.
-result: issue
-reported: "lists are loading, but both my gmail accounts can see all the lists from supabase that have null owner_id"
-severity: major
+result: pass
+note: "Re-tested 2026-05-31 after 10-06 RLS fix (f5514b5) + legacy null-owner row deletion. Both Gmail accounts see only own + member lists."
+severity: resolved
 
 ### 2. Copy Share Link
 expected: Open a list you own. ShareBanner shows a share control. Click Copy link — clipboard now holds an /invite/<code> URL (not /list/<code>).
@@ -41,8 +41,8 @@ result: pass
 ## Summary
 
 total: 6
-passed: 5
-issues: 1
+passed: 6
+issues: 0
 pending: 0
 skipped: 0
 blocked: 0
@@ -50,8 +50,11 @@ blocked: 0
 ## Gaps
 
 - truth: "After login, an authenticated user sees only their own lists and lists they are a member of — not lists belonging to other users."
-  status: failed
-  reason: "User reported: lists are loading, but both my gmail accounts can see all the lists from supabase that have null owner_id"
+  status: resolved
+  resolved_in: 10-06
+  resolved_at: 2026-05-31
+  reason: "Closed by 10-06 (commit f5514b5): dropped unconditional `owner_id IS NULL` branch from all six lists/items RLS policies + deleted 11 legacy null-owner rows. Browser re-test 2026-05-31: each Gmail account sees only own + member lists, no cross-account leakage."
+  original_reason: "User reported: lists are loading, but both my gmail accounts can see all the lists from supabase that have null owner_id"
   severity: major
   test: 1
   root_cause: "lists_select RLS policy leads with an unconditional `owner_id IS NULL` branch (no auth.uid() scope), granting every authenticated caller SELECT on all null-owner rows. D-08 removed the app-side .eq('owner_id') filter that previously masked it, so RLS is now the sole gate and the legacy null-owner lists leak across accounts. Same branch present in lists_update/lists_delete and all four items policies (secondary item leak)."

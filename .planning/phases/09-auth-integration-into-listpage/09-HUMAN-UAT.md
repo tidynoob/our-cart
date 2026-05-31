@@ -1,14 +1,20 @@
 ---
-status: partial
+status: testing
 phase: 09-auth-integration-into-listpage
 source: [09-VERIFICATION.md]
 started: 2026-05-29T12:50:00Z
-updated: 2026-05-29T12:50:00Z
+updated: 2026-05-29T13:10:00Z
 ---
 
 ## Current Test
 
-[awaiting human testing]
+number: 1
+name: Sidebar avatar renders from Google (PROF-02)
+expected: |
+  Open the sidebar after Google sign-in — a circular 40px Google avatar photo
+  renders (not an initials circle). In DevTools Network, the avatar img request
+  has no Referer header.
+awaiting: user response
 
 ## Tests
 
