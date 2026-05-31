@@ -28,7 +28,8 @@ interface ItemsState {
     name: string,
     quantity?: string,
     category?: string,
-    addedBy?: string
+    addedBy?: string,
+    userId?: string
   ) => Promise<void>
   updateItem: (
     id: string,
@@ -70,7 +71,7 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
     }
   },
 
-  addItem: async (listId, name, quantity, category, addedBy) => {
+  addItem: async (listId, name, quantity, category, addedBy, userId) => {
     const tempId = nanoid()
     const optimisticItem: Item = {
       id: tempId,
@@ -80,6 +81,7 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       category: category || null,
       checked: false,
       added_by: addedBy || null,
+      user_id: userId ?? null,
       created_at: new Date().toISOString(),
     }
 

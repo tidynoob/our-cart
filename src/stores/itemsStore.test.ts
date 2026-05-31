@@ -111,6 +111,7 @@ describe('itemsStore — toggleChecked', () => {
           category: null,
           checked: false,
           added_by: null,
+          user_id: null,
           created_at: new Date().toISOString(),
         },
       ],
@@ -183,6 +184,7 @@ describe('itemsStore — clearChecked', () => {
       category: null,
       checked: false,
       added_by: null,
+      user_id: null,
       created_at: new Date().toISOString(),
     },
     {
@@ -193,6 +195,7 @@ describe('itemsStore — clearChecked', () => {
       category: null,
       checked: true,
       added_by: null,
+      user_id: null,
       created_at: new Date().toISOString(),
     },
     {
@@ -203,6 +206,7 @@ describe('itemsStore — clearChecked', () => {
       category: null,
       checked: true,
       added_by: null,
+      user_id: null,
       created_at: new Date().toISOString(),
     },
   ]
@@ -276,6 +280,7 @@ const syncSeedItems = [
     category: null,
     checked: false,
     added_by: null,
+    user_id: null,
     created_at: new Date().toISOString(),
   },
   {
@@ -286,6 +291,7 @@ const syncSeedItems = [
     category: null,
     checked: false,
     added_by: null,
+    user_id: null,
     created_at: new Date().toISOString(),
   },
 ]
@@ -512,6 +518,7 @@ describe('itemsStore — mutation offline syncStatus guard', () => {
     category: null,
     checked: false,
     added_by: 'Test',
+    user_id: null,
     created_at: new Date().toISOString(),
   }
 

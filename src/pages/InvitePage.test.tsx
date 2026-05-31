@@ -29,7 +29,7 @@ describe('InvitePage', () => {
 
   it('renders spinner (animate-spin) while redeem_invite RPC is in flight', () => {
     // Mock rpc to return a never-settling promise
-    vi.mocked(supabase.rpc).mockReturnValue(new Promise(() => {}) as ReturnType<typeof supabase.rpc>)
+    vi.mocked(supabase.rpc).mockReturnValue(new Promise(() => {}) as unknown as ReturnType<typeof supabase.rpc>)
 
     renderAtRoute('ABC12345')
 
@@ -43,7 +43,7 @@ describe('InvitePage', () => {
       count: null,
       status: 200,
       statusText: 'OK',
-    })
+    } as never)
 
     renderAtRoute('ABC12345')
 
@@ -53,7 +53,7 @@ describe('InvitePage', () => {
   })
 
   it('does not navigate when code param is missing from the URL', () => {
-    vi.mocked(supabase.rpc).mockReturnValue(new Promise(() => {}) as ReturnType<typeof supabase.rpc>)
+    vi.mocked(supabase.rpc).mockReturnValue(new Promise(() => {}) as unknown as ReturnType<typeof supabase.rpc>)
 
     render(
       <MemoryRouter initialEntries={['/invite/']}>
@@ -76,7 +76,7 @@ describe('InvitePage', () => {
       count: null,
       status: 200,
       statusText: 'OK',
-    })
+    } as never)
 
     renderAtRoute('BADCODE')
 
@@ -92,7 +92,7 @@ describe('InvitePage', () => {
       count: null,
       status: 500,
       statusText: 'Internal Server Error',
-    })
+    } as never)
 
     renderAtRoute('BADCODE')
 

@@ -16,6 +16,7 @@ function makeItem(overrides: Partial<Item> = {}): Item {
     category: null,
     checked: false,
     added_by: null,
+    user_id: null,
     created_at: new Date().toISOString(),
     ...overrides,
   }

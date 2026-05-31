@@ -93,7 +93,7 @@ describe('Sidebar', () => {
     useListsStore.setState({ lists: sampleLists, loading: false, error: null } as never)
     ;(useMatch as ReturnType<typeof vi.fn>).mockReturnValue(null)
     // Reset getState mock
-    ;(useAuthStore as ReturnType<typeof vi.fn> & { getState?: () => unknown }).getState = vi.fn().mockReturnValue({
+    ;(useAuthStore as unknown as ReturnType<typeof vi.fn> & { getState?: () => unknown }).getState = vi.fn().mockReturnValue({
       updateDisplayName: mockUpdateDisplayName,
       signOut: mockSignOut,
       error: null,
@@ -146,7 +146,7 @@ describe('Sidebar — profile section (PROF-01/02/03)', () => {
     vi.clearAllMocks()
     useListsStore.setState({ lists: sampleLists, loading: false, error: null } as never)
     ;(useMatch as ReturnType<typeof vi.fn>).mockReturnValue(null)
-    ;(useAuthStore as ReturnType<typeof vi.fn> & { getState?: () => unknown }).getState = vi.fn().mockReturnValue({
+    ;(useAuthStore as unknown as ReturnType<typeof vi.fn> & { getState?: () => unknown }).getState = vi.fn().mockReturnValue({
       updateDisplayName: mockUpdateDisplayName,
       signOut: mockSignOut,
       error: null,
