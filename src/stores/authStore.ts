@@ -41,6 +41,30 @@ export const useAuthStore = create<AuthState>()((set) => ({
         } else {
           supabase.realtime.setAuth(null)
         }
+
+        // Sync user metadata into public.profiles on every sign-in.
+        // Fire-and-forget: do NOT await, do NOT make callback async (STATE.md locked decision D-08).
+        // Catches renames and users created before the handle_new_user trigger existed.
+        // Failure is non-critical — Postgres Changes subscription re-syncs on next update.
+        if (session?.user) {
+          const u = session.user
+          supabase.from('profiles').upsert(
+            {
+              id: u.id,
+              display_name:
+                u.user_metadata?.display_name ??
+                u.user_metadata?.full_name ??
+                u.user_metadata?.name ??
+                null,
+              avatar_url:
+                u.user_metadata?.avatar_url ??
+                u.user_metadata?.picture ??
+                null,
+              updated_at: new Date().toISOString(),
+            },
+            { onConflict: 'id' }
+          )
+        }
       }
     )
 

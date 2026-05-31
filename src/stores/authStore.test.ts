@@ -42,6 +42,8 @@ vi.mock('@/lib/supabase', () => ({
       getUser: mockGetUser,
     },
     realtime: { setAuth: mockSetAuth },
+    // Fire-and-forget profile upsert in onAuthStateChange — needs from() to not throw
+    from: () => ({ upsert: () => Promise.resolve({ data: null, error: null }) }),
   },
 }))
 
