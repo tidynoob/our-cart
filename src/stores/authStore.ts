@@ -49,6 +49,11 @@ export const useAuthStore = create<AuthState>()((set) => ({
 
   signInWithGoogle: async () => {
     set({ error: null })
+    // redirectTo MUST be on the Supabase Auth allow-list (Dashboard → Authentication →
+    // URL Configuration). If it isn't, Supabase silently falls back to "Site URL" —
+    // which on a stock dev setup is http://localhost:5173 and breaks prod OAuth.
+    // Required config: Site URL = prod origin; Additional Redirect URLs include
+    // prod origin, vercel preview wildcard, and http://localhost:5173.
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: { redirectTo: window.location.origin },
