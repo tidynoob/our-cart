@@ -2,42 +2,32 @@
 gsd_state_version: 1.0
 milestone: v2.0
 milestone_name: Accounts & Multi-List
-status: executing
-last_updated: "2026-05-30T17:34:42.411Z"
-last_activity: 2026-05-30
+status: Awaiting next milestone
+last_updated: "2026-05-31T14:59:59.825Z"
+last_activity: 2026-05-31 — Milestone v2.0 completed and archived
 progress:
   total_phases: 5
-  completed_phases: 4
+  completed_phases: 5
   total_plans: 23
-  completed_plans: 22
-  percent: 80
+  completed_plans: 23
+  percent: 100
 ---
 
 # Project State
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-05-27)
+See: .planning/PROJECT.md (updated 2026-05-31)
 
 **Core value:** Two people can see the same grocery list update in real-time, so nothing gets missed or double-bought.
-**Current focus:** Phase 10 — List Sharing
+**Current focus:** v2.0 shipped 2026-05-31 — planning next milestone
 
 ## Current Position
 
-Phase: 10 (List Sharing) — EXECUTING
-Plan: 5 of 6
-Status: Ready to execute
-Last activity: 2026-05-30
-
-```
-v2.0 Progress: [----------] 0% (0/5 phases)
-
-Phase 6: Auth Foundation       [ ] Not started
-Phase 7: Lists Infrastructure  [ ] Not started
-Phase 8: App Shell & Sidebar   [ ] Not started
-Phase 9: Auth Integration      [ ] Not started
-Phase 10: List Sharing         [ ] Not started
-```
+Phase: Milestone v2.0 complete
+Plan: —
+Status: Awaiting next milestone
+Last activity: 2026-05-31 — Milestone v2.0 completed and archived
 
 ## Performance Metrics
 
@@ -96,13 +86,19 @@ Phase 10: List Sharing         [ ] Not started
 | Enhanced Items | Manual item reorder (ITEM-02) | v2.x | Roadmap creation |
 | Member Management | Owner can remove member (MEMBER-01) | v2.x | Roadmap creation |
 | Member Management | Member can leave list (MEMBER-02) | v2.x | Roadmap creation |
+| Doc status | Phase 07 UAT (07-HUMAN-UAT.md) — `partial`, 1 scenario blocked_by prior-phase (now unblocked by Phase 10) | doc-debt | v2.0 close |
+| Doc status | Phase 08 verification (08-VERIFICATION.md) — `human_needed`, browser-only visual checks, code verified | doc-debt | v2.0 close |
+| Doc status | Phase 09 verification (09-VERIFICATION.md) — `human_needed`, code verified | doc-debt | v2.0 close |
+| Doc status | Phase 09 UAT (09-HUMAN-UAT.md) — `testing`, 6 browser scenarios | doc-debt | v2.0 close |
+
+Doc-status items acknowledged at milestone close: UAT/verification docs left un-flipped. Equivalent browser behaviors exercised live during Phase 10 two-account UAT (sign-in, sidebar, avatar, sharing all worked across two real Gmail accounts). No functional gaps — `tsc --noEmit` clean, 166 unit tests green (22 files), prod build green.
 
 ## Session Continuity
 
-Last session: 2026-05-30T17:34:32.598Z
-Stopped at: Completed 10-01-PLAN.md — SQL migrations for membership model
+Last session: 2026-05-31 -- v2.0 milestone close
+Stopped at: Milestone v2.0 archived, tagged, committed
 Resume file: None
-Next action: `/gsd-plan-phase 6`
+Next action: `/gsd-new-milestone`
 
 ## Decisions
 
@@ -116,3 +112,7 @@ Next action: `/gsd-plan-phase 6`
 - [Phase ?]: D-04: redeem_invite inserts auth.uid() only, never caller-supplied user_id, with ON CONFLICT DO NOTHING idempotency
 - [Phase ?]: D-05: ShareBanner uses /invite/:code URL so partners receive redemption flow not blocked ListPage
 - [Phase ?]: D-08: fetchLists drops owner_id filter; RLS membership policy gates rows; userId param kept as _userId for API compatibility
+
+## Operator Next Steps
+
+- Start the next milestone with /gsd-new-milestone

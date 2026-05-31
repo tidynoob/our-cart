@@ -41,6 +41,39 @@
 
 ---
 
+## Milestone: v2.0 — Accounts & Multi-List
+
+**Shipped:** 2026-05-31
+**Phases:** 5 | **Plans:** 23
+
+### What Was Built
+- Google OAuth accounts (PKCE) replacing anonymous URL access; persistent sessions + route protection
+- Multiple named lists per user with full CRUD
+- Slide-in sidebar navigation with active-list highlight
+- Profile (display name, Google avatar, sign out) and per-item attribution
+- Per-list invite-link sharing with idempotent `redeem_invite` RPC, gated by Supabase RLS membership
+
+### What Worked
+- Wave 0 test scaffolds before implementation (carried from v1.0) kept every phase green — 166 tests at close
+- SECURITY DEFINER helpers (`is_list_member`, invite lookup) cleanly sidestepped RLS recursion and the unauthenticated-invite catch-22
+- Two-browser manual UAT was the *only* thing that caught the cross-account data-isolation leak — unit tests could not
+
+### What Was Inefficient
+- RLS layering bit back late: removing the app-side owner filter (D-08) unmasked a latent `owner_id IS NULL` leak in policies written back in Phase 6 — cost a full gap-closure cycle (10-06) at the end of the milestone
+- Doc-status hygiene drifted: phases 7-9 shipped functionally but left UAT/verification docs at `human_needed`/`testing`, forcing an acknowledge step at close
+
+### Patterns Established
+- Membership-gated RLS as the sole row gate (no app-side ownership filtering)
+- `auth.uid()`-only inserts with `ON CONFLICT DO NOTHING` for idempotent joins
+- `referrerPolicy="no-referrer"` for Google CDN avatars
+
+### Key Lessons
+1. When you remove a masking app-side filter, re-audit every RLS policy it was hiding — the filter and the policy must agree
+2. Defense in depth: app sets `owner_id` on insert AND RLS enforces it (D-04)
+3. Flip verification/UAT doc statuses at phase close, not milestone close — stale statuses become audit noise
+
+---
+
 ## Cross-Milestone Trends
 
 ### Process Evolution
@@ -48,14 +81,17 @@
 | Milestone | Phases | Plans | Key Change |
 |-----------|--------|-------|------------|
 | v1.0 | 5 | 19 | Initial delivery — wave-based planning, gap closure pattern |
+| v2.0 | 5 | 23 | Auth + RLS; two-browser UAT became the critical security gate |
 
 ### Cumulative Quality
 
-| Milestone | Source LOC | Source Files | Gap Closures |
-|-----------|-----------|--------------|-------------|
-| v1.0 | 3,888 | 37 | 3 (02-04, 02-05, 05-05) |
+| Milestone | Source LOC | Source Files | Tests | Gap Closures |
+|-----------|-----------|--------------|-------|-------------|
+| v1.0 | 3,888 | 37 | — | 3 (02-04, 02-05, 05-05) |
+| v2.0 | 3,375 | 39 | 166 (22 files) | 1 (10-06 RLS leak) |
 
 ### Top Lessons (Verified Across Milestones)
 
 1. Test early on real devices — framework edge cases only surface in manual testing
 2. Keep requirement tracking in sync with implementation — drift compounds
+3. The hardest bugs live at the sync/security boundary (real-time reconnection in v1.0, RLS isolation in v2.0) and surface only under real two-client testing — keep investing in two-device/two-account UAT

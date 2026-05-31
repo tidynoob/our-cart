@@ -26,25 +26,31 @@ Two people can see the same grocery list update in real-time, so nothing gets mi
 - Offline detection and automatic reconnection — v1.0
 - Connection status indicator (Live/Reconnecting) — v1.0
 
-### Active
+- Google OAuth sign-in (one-tap, PKCE) — v2.0 (AUTH-01/02/03)
+- Editable user profile: display name, Google avatar, sign out — v2.0 (PROF-01/02/03)
+- Multiple named lists — create, rename, delete — v2.0 (LIST-01/02/03)
+- Slide-in sidebar navigation with active-list highlight — v2.0 (NAV-01/02/03)
+- Per-list sharing via invite links + idempotent redeem — v2.0 (SHARE-01/02)
+- Per-item attribution (Google avatar on own items) — v2.0 (PROF-02)
+- RLS membership-based data isolation — v2.0 (hardened in 10-06 after cross-account leak)
 
-**Current Milestone: v2.0 Accounts & Multi-List**
+### Active (v2.x — next milestone)
 
-**Goal:** Transform from anonymous single-list to authenticated multi-list app with Google sign-in, sidebar navigation, and persistent list management.
-
-**Target features:**
-- Google OAuth sign-in (via Supabase Auth)
-- Editable user profile / display name
-- Multiple lists — create, rename, delete
-- Sidebar navigation — view and switch between all lists
-- List sharing — invite partner to specific lists
-- Auth required — replaces anonymous link-share model
-- Header re-expand — way to bring back dismissed header/code banner
+- [ ] Supabase keep-alive — prevent free-tier project pausing (OPS-01)
+- [ ] Presence indicator — who's currently viewing the list (OPS-02)
+- [ ] Item notes field (ITEM-01)
+- [ ] Manual item reorder within a category (ITEM-02)
+- [ ] Owner can remove a member from a shared list (MEMBER-01)
+- [ ] Member can leave a shared list (MEMBER-02)
 
 ### Out of Scope
 
-- ~~Multiple lists~~ — moved to v2.0 Active scope
-- ~~User accounts/authentication~~ — moved to v2.0 Active scope (Google OAuth)
+- ~~Multiple lists~~ — delivered in v2.0
+- ~~User accounts/authentication~~ — delivered in v2.0 (Google OAuth)
+- Email/password auth — Google OAuth only; one auth method
+- More than 2 members per list — couples-focused, not a group app
+- Granular permissions/RBAC — equal collaborators
+- Email invitation sending — text the link; no SMTP
 - Offline mode/PWA — requires complex sync conflict resolution; internet required
 - Aisle mapping/store layout — categories are simple grouping only
 - Recipe integration — this is a list, not a meal planner
@@ -54,10 +60,17 @@ Two people can see the same grocery list update in real-time, so nothing gets mi
 
 ## Context
 
-Shipped v1.0 MVP in 3 days (2026-05-24 → 2026-05-26).
-Tech stack: React 19 + Vite 8 + Supabase (Postgres + Realtime) + Tailwind v4 + Zustand.
-3,888 LOC TypeScript across 37 source files. 19 plans across 5 phases.
+Shipped v2.0 Accounts & Multi-List on 2026-05-31 (5 phases, 23 plans).
+Tech stack: React 19 + Vite + TypeScript + Supabase (Postgres + Realtime + Auth) + Zustand + Tailwind v4 + shadcn/ui.
+~3,375 LOC TypeScript across 39 source files; 166 unit tests (22 files); 5 SQL migrations.
 Hosted on Vercel (free tier) + Supabase (free tier). $0/month operational cost.
+
+<details>
+<summary>v1.0 MVP (2026-05-26)</summary>
+
+Shipped v1.0 MVP in 3 days (2026-05-24 → 2026-05-26). 3,888 LOC across 37 files, 19 plans across 5 phases. Anonymous URL-share grocery list with real-time sync.
+
+</details>
 
 Two-person household use case (Mitch + wife). Primary use: one person plans at home, the other shops at store. Phone is primary device.
 
@@ -82,6 +95,11 @@ Two-person household use case (Mitch + wife). Primary use: one person plans at h
 | Belt-and-suspenders offline detection | Window events + mutation error guards cover all network failure modes | Good |
 | nanoid(8) for share codes | URL-friendly, collision-resistant, shorter than UUID | Good |
 | No debounce on autocomplete | O(n) filter on cached small list is imperceptible | Good |
+| Google OAuth only (PKCE) — v2.0 | One auth method for a 2-person app; Supabase default | Good |
+| RLS membership model over app-side owner filter — v2.0 | `is_list_member` (SECURITY DEFINER) gates rows; app filter removed (D-08) | Good — sole gate after 10-06 |
+| Persistent (no-expiry) invite tokens — v2.0 | Household use, no churn | Good |
+| `redeem_invite` inserts `auth.uid()` only, ON CONFLICT DO NOTHING — v2.0 | Idempotent join; no caller-supplied user_id | Good |
+| Drop unconditional `owner_id IS NULL` RLS branch — v2.0 (10-06) | Closed cross-account leak unmasked when D-08 removed the app filter | ⚠️ Revisit — tighten `lists_insert` WITH CHECK; remove dead branches in `lists_auth.sql` |
 
 ## Evolution
 
@@ -101,4 +119,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-05-27 after v2.0 milestone start*
+*Last updated: 2026-05-31 after v2.0 milestone*
