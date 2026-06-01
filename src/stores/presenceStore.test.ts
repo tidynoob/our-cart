@@ -11,11 +11,8 @@ import { usePresenceStore } from '@/stores/presenceStore'
 // (sync / join / leave), a stubbable presenceState(), and track()/untrack() spies.
 const {
   mockChannel,
-  mockChannelOn,
-  mockChannelSubscribe,
   mockTrack,
   mockUntrack,
-  mockPresenceState,
   mockRemoveChannel,
   getEventCb,
   getSubscribeCb,
@@ -51,11 +48,8 @@ const {
 
   return {
     mockChannel: _mockChannel,
-    mockChannelOn: _mockChannelOn,
-    mockChannelSubscribe: _mockChannelSubscribe,
     mockTrack: _mockTrack,
     mockUntrack: _mockUntrack,
-    mockPresenceState: _mockPresenceState,
     mockRemoveChannel: _mockRemoveChannel,
     getEventCb: (e: string) => _eventCbs[e],
     getSubscribeCb: () => _subscribeCb,

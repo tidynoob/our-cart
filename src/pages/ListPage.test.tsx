@@ -88,6 +88,12 @@ vi.mock('@/lib/supabase', () => ({
         if (cb) setTimeout(() => cb('SUBSCRIBED'), 0)
         return {}
       }),
+      // Presence channel methods (OPS-02): presenceStore calls track() on SUBSCRIBED
+      // and untrack()/presenceState() on cleanup/sync. Stub them so this shared channel
+      // mock also satisfies the presence-${id} channel.
+      track: vi.fn().mockResolvedValue('ok'),
+      untrack: vi.fn().mockResolvedValue('ok'),
+      presenceState: vi.fn().mockReturnValue({}),
     }),
     removeChannel: vi.fn(),
   },

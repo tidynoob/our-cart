@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useUIStore } from '@/stores/uiStore'
 import { useItemsStore } from '@/stores/itemsStore'
 import { useProfilesStore } from '@/stores/profilesStore'
+import { usePresenceStore } from '@/stores/presenceStore'
 import { useListsStore } from '@/stores/listsStore'
 import { useAuthStore } from '@/stores/authStore'
 import { groupItemsByCategory } from '@/lib/categories'
@@ -14,6 +15,7 @@ import { ShareBanner } from '@/components/ShareBanner'
 import { AddItemBar } from '@/components/AddItemBar'
 import { CategorySection } from '@/components/CategorySection'
 import { SyncStatus } from '@/components/SyncStatus'
+import { PresenceIndicator } from '@/components/PresenceIndicator'
 import { Spinner } from '@/components/Spinner'
 import MembersDialog from '@/components/MembersDialog'
 import { useSidebarContext } from '@/contexts/SidebarContext'
@@ -142,6 +144,15 @@ export default function ListPage() {
     // Load cross-user profiles for attribution (PROF-04) and subscribe to live updates (PROF-05)
     useProfilesStore.getState().loadForList(list.id)
 
+    // Open the presence channel (OPS-02). Dedicated topic presence-${id}; key=user.id.
+    // Identity is a presentational fallback only — PresenceIndicator renders from
+    // the server-sourced profilesStore. track() fires on SUBSCRIBED inside the store.
+    usePresenceStore.getState().subscribe(list.id, user!.id, {
+      display_name: resolveDisplayName(user!),
+      avatar_url:
+        user!.user_metadata?.avatar_url ?? user!.user_metadata?.picture ?? null,
+    })
+
     // Fetch list members so MembersDialog shows member rows (not spinner) (T3/T4 fix)
     fetchListMembers(list.id)
 
@@ -188,6 +199,7 @@ export default function ListPage() {
     return () => {
       useItemsStore.getState().unsubscribe()
       useProfilesStore.getState().unsubscribe()  // clean up profiles channel (Pitfall 4)
+      usePresenceStore.getState().unsubscribe()  // untrack + removeChannel presence (crit 2)
       supabase.removeChannel(listChannel)          // clean up list Broadcast channel (T-11-06-02)
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('offline', handleOffline)
@@ -403,6 +415,8 @@ export default function ListPage() {
               )}
             </div>
           )}
+          {/* Presence (OPS-02) — between the name block and SyncStatus; self never shown */}
+          <PresenceIndicator />
           <SyncStatus />
           {dismissedBanners.has(list.share_code) && (
             <Button

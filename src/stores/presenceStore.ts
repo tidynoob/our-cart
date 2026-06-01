@@ -61,11 +61,14 @@ export const usePresenceStore = create<PresenceState>()((set, get) => ({
     trackedIdentity = identity
 
     // Dedicated topic — never piggyback on items-${id} (RESEARCH Pitfall 5).
-    // key = user.id (NOT presence_ref) so two tabs dedupe to one key.
-    const channel = supabase
-      .channel(`presence-${listId}`, {
-        config: { presence: { key: userId } },
-      })
+    // key = user.id (NOT presence_ref) so two tabs dedupe to one key. Capture the
+    // channel object BEFORE chaining .on()/.subscribe() so the callbacks reference
+    // the stable channel (mirrors itemsStore reading the channel, not a chain result).
+    const channel = supabase.channel(`presence-${listId}`, {
+      config: { presence: { key: userId } },
+    })
+
+    channel
       .on('presence', { event: 'sync' }, () => {
         set({ others: deriveOthers(channel.presenceState(), userId) })
       })
