@@ -1,9 +1,22 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
-// Import from a module that does NOT exist yet — this WILL fail RED at module
-// resolution until Wave 1 (plan 12-02) creates src/components/PresenceIndicator.tsx
-// (and its @/stores/presenceStore dependency). That import failure IS the
-// intended Wave 0 state.
+
+// presenceStore (imported transitively below) imports the real @/lib/supabase,
+// whose createClient({ realtime: { worker: true } }) throws "Web Worker is not
+// supported" under jsdom. Mock the client exactly as the sibling store-importing
+// component tests do (e.g. ItemRow.test.tsx) — store state is seeded via setState,
+// so this stub is never exercised by the assertions below.
+vi.mock('@/lib/supabase', () => ({
+  supabase: {
+    from: vi.fn().mockReturnValue({ upsert: vi.fn() }),
+    channel: vi.fn().mockReturnValue({
+      on: vi.fn().mockReturnThis(),
+      subscribe: vi.fn().mockReturnValue({}),
+    }),
+    removeChannel: vi.fn(),
+  },
+}))
+
 import { PresenceIndicator } from './PresenceIndicator'
 import { usePresenceStore } from '@/stores/presenceStore'
 import { useProfilesStore } from '@/stores/profilesStore'
