@@ -66,6 +66,11 @@ export default function ListPage() {
   // Members dialog state — ephemeral UI, not Zustand
   const [membersDialogOpen, setMembersDialogOpen] = useState(false)
 
+  // List members state — fetched after list loads; undefined = loading spinner in dialog
+  const [listMembers, setListMembers] = useState<
+    { user_id: string; created_at: string }[] | undefined
+  >(undefined)
+
   // Member removal eject state — set true when current user is removed from list
   const [removedFromList, setRemovedFromList] = useState(false)
 
@@ -137,6 +142,9 @@ export default function ListPage() {
     // Load cross-user profiles for attribution (PROF-04) and subscribe to live updates (PROF-05)
     useProfilesStore.getState().loadForList(list.id)
 
+    // Fetch list members so MembersDialog shows member rows (not spinner) (T3/T4 fix)
+    fetchListMembers(list.id)
+
     // Open list-level Broadcast channel for member_removed eject (MEMBER-01 / D-09)
     // Topic 'list-{listId}' is distinct from 'items-{listId}' (RESEARCH Pattern 6)
     const listChannel = supabase
@@ -184,8 +192,21 @@ export default function ListPage() {
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('offline', handleOffline)
       window.removeEventListener('online', handleOnline)
+      setListMembers(undefined)  // reset so dialog shows spinner on next list load
     }
   }, [list, user, navigate]) // user + navigate added for member_removed handler deps
+
+  // --- Members Fetch ---
+
+  /** Fetch list_members for the current list and populate listMembers state. */
+  async function fetchListMembers(listId: string) {
+    const { data } = await supabase
+      .from('list_members')
+      .select('user_id, created_at')
+      .eq('list_id', listId)
+      .order('created_at', { ascending: true })
+    setListMembers(data ?? [])
+  }
 
   // --- Edit/Delete Handlers ---
 
@@ -542,8 +563,10 @@ export default function ListPage() {
         listId={list.id}
         listName={displayName ?? list.name}
         ownerId={list.owner_id ?? ''}
+        members={listMembers?.map(m => ({ user_id: m.user_id, joined_at: m.created_at }))}
         open={membersDialogOpen}
         onOpenChange={setMembersDialogOpen}
+        onMembersChanged={() => fetchListMembers(list.id)}
       />
     </div>
   )

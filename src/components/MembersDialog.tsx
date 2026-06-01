@@ -28,6 +28,8 @@ interface MembersDialogProps {
   members?: MemberEntry[]
   open: boolean
   onOpenChange: (open: boolean) => void
+  /** Called after a member is successfully removed so the parent can re-fetch. */
+  onMembersChanged?: () => void
 }
 
 /**
@@ -50,6 +52,7 @@ export default function MembersDialog({
   members,
   open,
   onOpenChange,
+  onMembersChanged,
 }: MembersDialogProps) {
   const navigate = useNavigate()
   // Use whole-state form so vi.fn().mockReturnValue({user,profiles}) works in tests.
@@ -97,6 +100,7 @@ export default function MembersDialog({
     } else {
       setRemoveConfirmOpen(false)
       setTargetMember(null)
+      onMembersChanged?.()
     }
   }
 
