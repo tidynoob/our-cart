@@ -113,6 +113,8 @@ describe('itemsStore — toggleChecked', () => {
           added_by: null,
           user_id: null,
           created_at: new Date().toISOString(),
+          note: null,
+          position: null,
         },
       ],
       loading: false,
@@ -186,6 +188,8 @@ describe('itemsStore — clearChecked', () => {
       added_by: null,
       user_id: null,
       created_at: new Date().toISOString(),
+      note: null,
+      position: null,
     },
     {
       id: 'item-B',
@@ -197,6 +201,8 @@ describe('itemsStore — clearChecked', () => {
       added_by: null,
       user_id: null,
       created_at: new Date().toISOString(),
+      note: null,
+      position: null,
     },
     {
       id: 'item-C',
@@ -208,6 +214,8 @@ describe('itemsStore — clearChecked', () => {
       added_by: null,
       user_id: null,
       created_at: new Date().toISOString(),
+      note: null,
+      position: null,
     },
   ]
 
@@ -282,6 +290,8 @@ const syncSeedItems = [
     added_by: null,
     user_id: null,
     created_at: new Date().toISOString(),
+    note: null,
+    position: null,
   },
   {
     id: 'sync-item-2',
@@ -293,6 +303,8 @@ const syncSeedItems = [
     added_by: null,
     user_id: null,
     created_at: new Date().toISOString(),
+    note: null,
+    position: null,
   },
 ]
 
@@ -478,6 +490,19 @@ describe('itemsStore — mergeReducer', () => {
     expect(items.find((i) => i.id === 'sync-item-1')?.name).toBe('Apples (updated)')
   })
 
+  it('UPDATE from partner: merges a note edit into the existing row (ITEM-01 note sync)', () => {
+    // A partner adds a note to an item that is NOT pending in this client.
+    // The note must ride the existing replace-row-by-id reducer (no new subscription).
+    const payloadCb = getPayloadCallback()
+    const withNote = { ...syncSeedItems[0], note: 'organic' }
+
+    payloadCb({ eventType: 'UPDATE', new: withNote, old: syncSeedItems[0] })
+
+    const items = useItemsStore.getState().items
+    expect(items).toHaveLength(2)
+    expect(items.find((i) => i.id === 'sync-item-1')?.note).toBe('organic')
+  })
+
   it('DELETE from partner: removes item by id from payload.old (SYNC-01)', () => {
     const payloadCb = getPayloadCallback()
     // payload.old contains only the primary key (RLS behaviour)
@@ -520,6 +545,8 @@ describe('itemsStore — mutation offline syncStatus guard', () => {
     added_by: 'Test',
     user_id: null,
     created_at: new Date().toISOString(),
+    note: null,
+    position: null,
   }
 
   const checkedSeedItem = {
@@ -601,5 +628,134 @@ describe('itemsStore — mutation offline syncStatus guard', () => {
 
     // syncStatus should remain 'live' (not changed to 'reconnecting')
     expect(useItemsStore.getState().syncStatus).toBe('live')
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// RED (Wave 0, ITEM-01/02): reorderItem + pendingReorders echo-skip.
+// `reorderItem` does not exist on the store yet — these calls throw at runtime
+// until the action lands in itemsStore.ts (Wave 1). The contracts pinned here:
+//   (a) cross-category optimistic write: a SINGLE update carries {category, position}
+//   (b) rollback on error: reverts position+category, sets 'Failed to reorder item'
+//   (c) pendingReorders one-shot echo-skip: own UPDATE echo is consumed, no flicker;
+//       a subsequent partner UPDATE for the same id still merges
+// ──────────────────────────────────────────────────────────────────────────
+
+// Typed access to the not-yet-existing reorder action (RED until Wave 1).
+type StoreWithReorder = ReturnType<typeof useItemsStore.getState> & {
+  reorderItem: (activeId: string, overId: string) => Promise<void>
+}
+function reorder(activeId: string, overId: string): Promise<void> {
+  return (useItemsStore.getState() as StoreWithReorder).reorderItem(activeId, overId)
+}
+
+describe('itemsStore — reorderItem (ITEM-02)', () => {
+  // Two categories so we can exercise a cross-category drop.
+  const reorderSeed = [
+    {
+      id: 'r-produce-1', list_id: 'list-r', name: 'Apples', quantity: null,
+      category: 'Produce', checked: false, added_by: null, user_id: null,
+      created_at: '2026-01-01T00:00:00Z', note: null, position: 'a1',
+    },
+    {
+      id: 'r-produce-2', list_id: 'list-r', name: 'Bananas', quantity: null,
+      category: 'Produce', checked: false, added_by: null, user_id: null,
+      created_at: '2026-01-01T00:01:00Z', note: null, position: 'a2',
+    },
+    {
+      id: 'r-dairy-1', list_id: 'list-r', name: 'Milk', quantity: null,
+      category: 'Dairy', checked: false, added_by: null, user_id: null,
+      created_at: '2026-01-01T00:02:00Z', note: null, position: 'a1',
+    },
+  ]
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useItemsStore.setState({
+      items: reorderSeed.map((i) => ({ ...i })),
+      loading: false,
+      error: null,
+      syncStatus: 'live',
+      channel: null,
+    })
+    mockUpdateFn._resolvePromise = undefined
+    resetCapturedCb()
+  })
+
+  it('cross-category optimistic: writes {category, position} in a SINGLE update and adopts target category', async () => {
+    // Hold the update open so we can inspect the optimistic state before it resolves.
+    let resolveUpdate!: (value: unknown) => void
+    const pending = new Promise((res) => { resolveUpdate = res })
+    mockUpdateFn._resolvePromise = pending
+
+    // Drag a Produce item onto a Dairy item — should adopt 'Dairy' + a new position.
+    const p = reorder('r-produce-1', 'r-dairy-1')
+
+    const dragged = useItemsStore.getState().items.find((i) => i.id === 'r-produce-1')!
+    // Optimistic category adoption (cross-category).
+    expect(dragged.category).toBe('Dairy')
+    // Position changed off its original 'a1'.
+    expect(dragged.position).not.toBe('a1')
+
+    // Exactly one supabase update, carrying BOTH category and position together.
+    expect(mockUpdateFn).toHaveBeenCalledTimes(1)
+    const changes = mockUpdateFn.mock.calls[0][0] as Record<string, unknown>
+    expect(changes).toHaveProperty('category', 'Dairy')
+    expect(changes).toHaveProperty('position')
+    expect(typeof changes.position).toBe('string')
+
+    resolveUpdate({ data: null, error: null })
+    await p
+  })
+
+  it('rollback on error: reverts position + category and sets "Failed to reorder item"', async () => {
+    const prev = useItemsStore.getState().items.find((i) => i.id === 'r-produce-1')!
+    const prevPosition = prev.position
+    const prevCategory = prev.category
+    mockUpdateFn._resolvePromise = Promise.resolve({ data: null, error: { message: 'DB error' } })
+
+    await reorder('r-produce-1', 'r-dairy-1')
+
+    const after = useItemsStore.getState().items.find((i) => i.id === 'r-produce-1')!
+    expect(after.position).toBe(prevPosition)
+    expect(after.category).toBe(prevCategory)
+    expect(useItemsStore.getState().error).toBe('Failed to reorder item')
+  })
+
+  it('pendingReorders one-shot echo-skip: own UPDATE echo is consumed (no flicker), next partner UPDATE still merges', async () => {
+    mockUpdateFn._resolvePromise = Promise.resolve({ data: null, error: null })
+
+    // Wire the realtime channel so we can fire UPDATE payloads through the reducer.
+    useItemsStore.getState().subscribeToList('list-r')
+    const onCalls = mockChannelOn.mock.calls
+    const payloadCb = onCalls[onCalls.length - 1][2] as (p: Record<string, unknown>) => void
+
+    // Perform an optimistic reorder — leaves the id in pendingReorders on success.
+    await reorder('r-produce-1', 'r-dairy-1')
+    const optimistic = useItemsStore.getState().items.find((i) => i.id === 'r-produce-1')!
+    const optimisticPosition = optimistic.position
+    const optimisticCategory = optimistic.category
+
+    // Fire the OWN echo carrying a STALE position — it must be consumed and skipped.
+    payloadCb({
+      eventType: 'UPDATE',
+      new: { ...optimistic, position: 'STALE', category: 'STALE_CAT' },
+      old: optimistic,
+    })
+
+    const afterEcho = useItemsStore.getState().items.find((i) => i.id === 'r-produce-1')!
+    // State unchanged — the optimistic values survived (no flicker).
+    expect(afterEcho.position).toBe(optimisticPosition)
+    expect(afterEcho.category).toBe(optimisticCategory)
+
+    // A SUBSEQUENT UPDATE for the same id (a real partner edit) merges normally
+    // because the one-shot guard was already consumed.
+    payloadCb({
+      eventType: 'UPDATE',
+      new: { ...afterEcho, note: 'partner note' },
+      old: afterEcho,
+    })
+    const afterPartner = useItemsStore.getState().items.find((i) => i.id === 'r-produce-1')!
+    expect(afterPartner.note).toBe('partner note')
   })
 })
