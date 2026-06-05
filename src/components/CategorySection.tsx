@@ -8,7 +8,11 @@ interface CategorySectionProps {
   deletingItemId: string | null
   onItemTap: (id: string) => void
   onCancelEdit: () => void
-  onSave: (id: string, changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>) => void
+  onSave: (
+    id: string,
+    changes: Partial<Pick<Item, 'name' | 'quantity' | 'category' | 'note' | 'position'>>
+  ) => void
+  onStep?: (id: string, quantity: string) => void
   onDelete: (id: string) => void
   onConfirmDelete: (id: string) => void
   onCancelDelete: () => void
@@ -31,6 +35,7 @@ export function CategorySection({
   onItemTap,
   onCancelEdit,
   onSave,
+  onStep,
   onDelete,
   onConfirmDelete,
   onCancelDelete,
@@ -55,6 +60,7 @@ export function CategorySection({
             onTap={() => onItemTap(item.id)}
             onCancelEdit={onCancelEdit}
             onSave={onSave}
+            onStep={onStep}
             onDelete={() => onDelete(item.id)}
             onCancelDelete={onCancelDelete}
             onConfirmDelete={() => onConfirmDelete(item.id)}

@@ -1,6 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { Menu, Pencil, Share2, Trash2, Users } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import { supabase } from '@/lib/supabase'
 import { useUIStore } from '@/stores/uiStore'
 import { useItemsStore } from '@/stores/itemsStore'
@@ -92,6 +106,15 @@ export default function ListPage() {
   const deleteItem = useItemsStore((state) => state.deleteItem)
   const toggleChecked = useItemsStore((state) => state.toggleChecked)
   const clearChecked = useItemsStore((state) => state.clearChecked)
+  const reorderItem = useItemsStore((state) => state.reorderItem)
+
+  // dnd-kit sensors (ITEM-02 / RESEARCH Pattern 1): PointerSensor with an 8px
+  // activation distance so tap/scroll/swipe don't start a drag (Pitfall 4), plus
+  // a KeyboardSensor for accessible pickup/move.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   // Derived from store — no new state field (per research: items.filter(i => i.checked).length)
   const checkedCount = items.filter((i) => i.checked).length
@@ -236,7 +259,10 @@ export default function ListPage() {
   }
 
   /** Save edited item changes via store action, then exit edit mode. */
-  function handleSave(id: string, changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>) {
+  function handleSave(
+    id: string,
+    changes: Partial<Pick<Item, 'name' | 'quantity' | 'category' | 'note' | 'position'>>
+  ) {
     // Store handles rollback + error state internally; .catch() guards
     // against unhandled rejections from network-level throws (WR-03).
     updateItem(id, changes).catch(() => {})
@@ -270,6 +296,23 @@ export default function ListPage() {
     // Store handles rollback + error state internally; .catch() guards
     // against unhandled rejections from network-level throws (WR-03).
     toggleChecked(id).catch(() => {})
+  }
+
+  // --- Drag-reorder Handler (ITEM-02 / RESEARCH Pattern 1) ---
+
+  /** Drop end → reorder via store. Guards no-op drops; store owns the single
+   *  {category, position} write + rollback. .catch() guards unhandled rejection. */
+  function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    reorderItem(String(active.id), String(over.id)).catch(() => {})
+  }
+
+  // --- Quantity Stepper Handler (ITEM-03) ---
+
+  /** Stepper tap → quantity-only optimistic update via store. */
+  function handleStep(id: string, quantity: string) {
+    updateItem(id, { quantity }).catch(() => {})
   }
 
   // --- Clear Checked Handler (Phase 3 — SHOP-03/04) ---
@@ -332,6 +375,8 @@ export default function ListPage() {
   }
 
   const grouped = groupItemsByCategory(items)
+  // Flat id list (grouped/sorted order) for the single list-wide SortableContext.
+  const flatItemIds = grouped.flatMap((g) => g.items.map((i) => i.id))
 
   return (
     <div className="min-h-screen flex flex-col items-center">
@@ -479,23 +524,39 @@ export default function ListPage() {
             </div>
           )}
 
-          {/* Category sections */}
-          {!itemsLoading && grouped.map((group) => (
-            <CategorySection
-              key={group.category}
-              category={group.category}
-              items={group.items}
-              editingItemId={editingItemId}
-              deletingItemId={deletingItemId}
-              onItemTap={handleItemTap}
-              onCancelEdit={handleCancelEdit}
-              onSave={handleSave}
-              onDelete={handleDelete}
-              onConfirmDelete={handleConfirmDelete}
-              onCancelDelete={handleCancelDelete}
-              onToggle={handleToggle}
-            />
-          ))}
+          {/* Category sections — single list-wide DndContext + SortableContext
+              (ITEM-02 / RESEARCH Pattern 1). Cross-category MOVE is computed in
+              handleDragEnd → reorderItem (one {category, position} write). */}
+          {!itemsLoading && (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={flatItemIds}
+                strategy={verticalListSortingStrategy}
+              >
+                {grouped.map((group) => (
+                  <CategorySection
+                    key={group.category}
+                    category={group.category}
+                    items={group.items}
+                    editingItemId={editingItemId}
+                    deletingItemId={deletingItemId}
+                    onItemTap={handleItemTap}
+                    onCancelEdit={handleCancelEdit}
+                    onSave={handleSave}
+                    onStep={handleStep}
+                    onDelete={handleDelete}
+                    onConfirmDelete={handleConfirmDelete}
+                    onCancelDelete={handleCancelDelete}
+                    onToggle={handleToggle}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          )}
 
           {/* Clear completed button — only rendered when checked items exist (D-06) */}
           {!itemsLoading && checkedCount > 0 && (

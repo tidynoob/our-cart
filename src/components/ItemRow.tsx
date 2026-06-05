@@ -33,6 +33,10 @@ interface ItemRowProps {
     id: string,
     changes: Partial<Pick<Item, 'name' | 'quantity' | 'category' | 'note' | 'position'>>
   ) => void
+  /** Stepper tap handler (ITEM-03). Optional — falls back to onSave when absent
+   *  (preserves the Wave-0 stepper→onSave contract while letting ListPage wire a
+   *  dedicated quantity-only handler). */
+  onStep?: (id: string, quantity: string) => void
   onToggle: (id: string) => void
 }
 
@@ -65,8 +69,13 @@ export function ItemRow({
   onConfirmDelete,
   onCancelEdit,
   onSave,
+  onStep,
   onToggle,
 }: ItemRowProps) {
+  // Stepper writes a quantity-only change. Prefer the dedicated onStep handler
+  // when ListPage wires one; otherwise route through onSave (Wave-0 contract).
+  const stepQuantity = (id: string, quantity: string) =>
+    onStep ? onStep(id, quantity) : onSave(id, { quantity })
   // REACTIVE selector — re-renders when profilesStore.profiles changes (PROF-05 live names)
   // Do NOT use useProfilesStore.getState().profiles — non-reactive snapshot breaks PROF-05.
   const profiles = useProfilesStore((state) => state.profiles)
@@ -425,7 +434,7 @@ export function ItemRow({
               aria-label="Decrease quantity"
               onClick={(e) => {
                 e.stopPropagation()
-                onSave(item.id, { quantity: String(Math.max(1, qty - 1)) })
+                stepQuantity(item.id, String(Math.max(1, qty - 1)))
               }}
             >
               <Minus className="size-5 text-muted-foreground" />
@@ -438,7 +447,7 @@ export function ItemRow({
               aria-label="Increase quantity"
               onClick={(e) => {
                 e.stopPropagation()
-                onSave(item.id, { quantity: String(qty + 1) })
+                stepQuantity(item.id, String(qty + 1))
               }}
             >
               <Plus className="size-5 text-muted-foreground" />
