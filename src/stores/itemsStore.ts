@@ -43,6 +43,7 @@ interface ItemsState {
     changes: Partial<Pick<Item, 'name' | 'quantity' | 'category' | 'note' | 'position'>>
   ) => Promise<void>
   deleteItem: (id: string) => Promise<void>
+  reorderItem: (activeId: string, overId: string) => Promise<void>
   toggleChecked: (id: string) => Promise<void>
   clearChecked: (listId: string) => Promise<void>
   subscribeToList: (listId: string) => void
@@ -189,6 +190,55 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
         syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
       }))
     }
+  },
+
+  reorderItem: async (activeId, overId) => {
+    // D-09 cross-category move: dropping onto an item in another section adopts that
+    // section's category in a SINGLE combined {category, position} write. Mirrors the
+    // updateItem optimistic + per-item rollback template with the pendingReorders
+    // echo guard (D-10).
+    const prev = get().items.find((i) => i.id === activeId)
+    const target = get().items.find((i) => i.id === overId)
+    if (!prev || !target) return
+
+    const newCategory = target.category
+
+    // Neighbors in the TARGET category (sorted by position), excluding the dragged item.
+    // before/after are the drop-point boundaries; null at either end appends/prepends.
+    // computeReorderKey always receives (before, after) sorted with null at boundaries.
+    const inCat = get()
+      .items.filter((i) => i.category === newCategory && i.id !== activeId)
+      .sort(byPosition)
+    const overIdx = inCat.findIndex((i) => i.id === overId)
+    const before = inCat[overIdx]?.position ?? null
+    const after = inCat[overIdx + 1]?.position ?? null
+    const newPosition = computeReorderKey(before, after)
+
+    // Echo guard BEFORE the optimistic set so our own UPDATE echo is consumed (no flicker).
+    pendingReorders.add(activeId)
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.id === activeId ? { ...i, category: newCategory, position: newPosition } : i
+      ),
+    }))
+
+    // ONE combined write carrying BOTH category and position (D-09).
+    const { error } = await supabase
+      .from('items')
+      .update({ category: newCategory, position: newPosition })
+      .eq('id', activeId)
+
+    if (error) {
+      // Per-item rollback to prev; drop the echo guard since no echo will arrive.
+      // SYNC-03: If offline, also set syncStatus to 'reconnecting' (belt-and-suspenders).
+      pendingReorders.delete(activeId)
+      set((state) => ({
+        items: state.items.map((i) => (i.id === activeId ? prev : i)),
+        error: 'Failed to reorder item',
+        syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
+      }))
+    }
+    // On success: leave activeId in pendingReorders — the UPDATE branch consumes it.
   },
 
   toggleChecked: async (id) => {

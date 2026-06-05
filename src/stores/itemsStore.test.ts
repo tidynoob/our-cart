@@ -572,7 +572,10 @@ describe('itemsStore — mutation offline syncStatus guard', () => {
   })
 
   afterEach(() => {
-    vi.restoreAllMocks()
+    // Restore ONLY the per-test navigator.onLine getter spy. vi.restoreAllMocks()
+    // here is too broad — it strips the module-level supabase.channel() mockReturnValue,
+    // which breaks the later reorderItem echo-skip test that calls subscribeToList.
+    vi.spyOn(navigator, 'onLine', 'get').mockRestore()
   })
 
   it('addItem error + offline sets syncStatus to "reconnecting" (SYNC-03)', async () => {
