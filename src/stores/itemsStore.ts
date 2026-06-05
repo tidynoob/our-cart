@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { nanoid } from 'nanoid'
 import { supabase } from '@/lib/supabase'
+import { computeReorderKey, byPosition } from '@/lib/ordering'
 import type { Item } from '@/types/item'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -14,6 +15,12 @@ let inFlightListId: string | null = null
 // server rows that match a pending optimistic item (by name) — prevents the race where
 // the Realtime INSERT event arrives before the HTTP response replaces the temp ID (CR-01).
 const pendingTempIds = new Set<string>()
+
+// One-shot echo-guard for reorder/move writes (D-10). Mirrors pendingTempIds exactly:
+// reorderItem adds the activeId before its optimistic set, and the Realtime UPDATE
+// branch consumes-and-skips the matching own-write echo so the row does not flicker
+// back to a stale {category, position} before the optimistic value is confirmed.
+const pendingReorders = new Set<string>()
 
 interface ItemsState {
   items: Item[]
@@ -33,7 +40,7 @@ interface ItemsState {
   ) => Promise<void>
   updateItem: (
     id: string,
-    changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>
+    changes: Partial<Pick<Item, 'name' | 'quantity' | 'category' | 'note' | 'position'>>
   ) => Promise<void>
   deleteItem: (id: string) => Promise<void>
   toggleChecked: (id: string) => Promise<void>
@@ -73,6 +80,15 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
 
   addItem: async (listId, name, quantity, category, addedBy, userId) => {
     const tempId = nanoid()
+    // Pitfall 3 / D-11: new rows get a position key appended AFTER the current max
+    // so they sort to the end and are never null-position. computeReorderKey(max, null)
+    // wraps generateKeyBetween; null currentMax yields the first key for an empty list.
+    const currentMax =
+      [...get().items]
+        .filter((i) => i.position != null)
+        .sort(byPosition)
+        .at(-1)?.position ?? null
+    const position = computeReorderKey(currentMax, null)
     const optimisticItem: Item = {
       id: tempId,
       list_id: listId,
@@ -83,10 +99,8 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       added_by: addedBy || null,
       user_id: userId ?? null,
       created_at: new Date().toISOString(),
-      // Plan 01 spine: new rows start position-null (created_at fallback handles
-      // ordering); Plan 02 wires generateKeyBetween(currentMax, null) on insert.
       note: null,
-      position: null,
+      position,
     }
 
     // Optimistic add — append to items array and track temp ID for dedup (CR-01)
@@ -101,6 +115,7 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
         quantity: quantity || null,
         category: category || null,
         added_by: addedBy || null,
+        position,
       })
       .select()
       .single()
@@ -282,6 +297,14 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
               // WR-03 fix: Early return same reference when no item matches, avoiding
               // unnecessary re-renders. Mirrors the DELETE branch's defensive pattern.
               const updatedId = (newRow as Item).id
+              // D-10 one-shot echo-skip: consume our own reorder UPDATE echo so the row
+              // keeps its optimistic {category, position} (no flicker). Mirrors the
+              // pendingTempIds consume-and-skip in the INSERT branch. A subsequent
+              // partner UPDATE for the same id is not pending and merges normally below.
+              if (pendingReorders.has(updatedId)) {
+                pendingReorders.delete(updatedId)
+                return state
+              }
               if (!state.items.some((i) => i.id === updatedId)) return state
               return {
                 items: state.items.map((i) =>
