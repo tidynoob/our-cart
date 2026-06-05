@@ -682,6 +682,7 @@ describe('itemsStore — reorderItem (ITEM-02)', () => {
       channel: null,
     })
     mockUpdateFn._resolvePromise = undefined
+    mockInsertFn._resolvePromise = undefined
     resetCapturedCb()
   })
 
@@ -723,6 +724,90 @@ describe('itemsStore — reorderItem (ITEM-02)', () => {
     expect(after.position).toBe(prevPosition)
     expect(after.category).toBe(prevCategory)
     expect(useItemsStore.getState().error).toBe('Failed to reorder item')
+  })
+
+  it('CR-01 upward drag: dropping a lower item ONTO a higher item lands it ABOVE the target', async () => {
+    // Three items in Produce, ascending positions a1 < a2 < a3.
+    useItemsStore.setState({
+      items: [
+        { id: 'up-1', list_id: 'list-r', name: 'A', quantity: null, category: 'Produce', checked: false, added_by: null, user_id: null, created_at: '2026-01-01T00:00:00Z', note: null, position: 'a1' },
+        { id: 'up-2', list_id: 'list-r', name: 'B', quantity: null, category: 'Produce', checked: false, added_by: null, user_id: null, created_at: '2026-01-01T00:01:00Z', note: null, position: 'a2' },
+        { id: 'up-3', list_id: 'list-r', name: 'C', quantity: null, category: 'Produce', checked: false, added_by: null, user_id: null, created_at: '2026-01-01T00:02:00Z', note: null, position: 'a3' },
+      ],
+      loading: false, error: null, syncStatus: 'live', channel: null,
+    })
+    mockUpdateFn._resolvePromise = Promise.resolve({ data: null, error: null })
+
+    // Drag C (index 2, pos a3) UPWARD onto A (index 0, pos a1).
+    // User intent: land C ABOVE A → new key must sort BEFORE 'a1'.
+    await reorder('up-3', 'up-1')
+
+    const moved = useItemsStore.getState().items.find((i) => i.id === 'up-3')!
+    expect(moved.position! < 'a1').toBe(true)
+  })
+
+  it('CR-01 downward drag: dropping a higher item ONTO a lower item lands it BELOW the target', async () => {
+    useItemsStore.setState({
+      items: [
+        { id: 'dn-1', list_id: 'list-r', name: 'A', quantity: null, category: 'Produce', checked: false, added_by: null, user_id: null, created_at: '2026-01-01T00:00:00Z', note: null, position: 'a1' },
+        { id: 'dn-2', list_id: 'list-r', name: 'B', quantity: null, category: 'Produce', checked: false, added_by: null, user_id: null, created_at: '2026-01-01T00:01:00Z', note: null, position: 'a2' },
+        { id: 'dn-3', list_id: 'list-r', name: 'C', quantity: null, category: 'Produce', checked: false, added_by: null, user_id: null, created_at: '2026-01-01T00:02:00Z', note: null, position: 'a3' },
+      ],
+      loading: false, error: null, syncStatus: 'live', channel: null,
+    })
+    mockUpdateFn._resolvePromise = Promise.resolve({ data: null, error: null })
+
+    // Drag A (index 0) DOWNWARD onto B (index 1): land BELOW B → between a2 and a3.
+    await reorder('dn-1', 'dn-2')
+
+    const moved = useItemsStore.getState().items.find((i) => i.id === 'dn-1')!
+    expect(moved.position! > 'a2').toBe(true)
+    expect(moved.position! < 'a3').toBe(true)
+  })
+
+  it('CR-02 duplicate positions: reorder between equal-position neighbors does NOT throw/silently no-op', async () => {
+    // Two items in the SAME category share the SAME position (concurrent-add collision).
+    // A reorder whose neighbors straddle them must NOT throw (silent abort); it must
+    // apply an optimistic move and write through.
+    useItemsStore.setState({
+      items: [
+        { id: 'dup-1', list_id: 'list-r', name: 'A', quantity: null, category: 'Produce', checked: false, added_by: null, user_id: null, created_at: '2026-01-01T00:00:00Z', note: null, position: 'a1' },
+        { id: 'dup-2', list_id: 'list-r', name: 'B', quantity: null, category: 'Produce', checked: false, added_by: null, user_id: null, created_at: '2026-01-01T00:01:00Z', note: null, position: 'a2' },
+        { id: 'dup-3', list_id: 'list-r', name: 'C', quantity: null, category: 'Produce', checked: false, added_by: null, user_id: null, created_at: '2026-01-01T00:02:00Z', note: null, position: 'a2' },
+      ],
+      loading: false, error: null, syncStatus: 'live', channel: null,
+    })
+    mockUpdateFn._resolvePromise = Promise.resolve({ data: null, error: null })
+
+    // Drag A downward onto B (the first of the two equal-position rows).
+    await expect(reorder('dup-1', 'dup-2')).resolves.toBeUndefined()
+
+    // Optimistic move applied + a single combined write — no silent no-op, no thrown error.
+    const moved = useItemsStore.getState().items.find((i) => i.id === 'dup-1')!
+    expect(typeof moved.position).toBe('string')
+    expect(mockUpdateFn).toHaveBeenCalledTimes(1)
+    expect(useItemsStore.getState().error).toBeNull()
+  })
+
+  it('WR-01 addItem under rapid double-add: two synchronous adds get DISTINCT position keys', async () => {
+    useItemsStore.setState({
+      items: [
+        { id: 'seed', list_id: 'list-r', name: 'Seed', quantity: null, category: null, checked: false, added_by: null, user_id: null, created_at: '2026-01-01T00:00:00Z', note: null, position: 'a1' },
+      ],
+      loading: false, error: null, syncStatus: 'live', channel: null,
+    })
+    // Insert resolves with null data so the optimistic item stays in place by temp id.
+    mockInsertFn._resolvePromise = Promise.resolve({ data: null, error: null })
+
+    // Fire two adds in the SAME tick (no await between) — the WR-01 collision scenario.
+    const p1 = useItemsStore.getState().addItem('list-r', 'X')
+    const p2 = useItemsStore.getState().addItem('list-r', 'Y')
+    await Promise.all([p1, p2])
+
+    const positions = useItemsStore.getState().items.map((i) => i.position)
+    const uniquePositions = new Set(positions)
+    // No two items share a position key (the duplicate-key bug feeding CR-02).
+    expect(uniquePositions.size).toBe(positions.length)
   })
 
   it('pendingReorders one-shot echo-skip: own UPDATE echo is consumed (no flicker), next partner UPDATE still merges', async () => {

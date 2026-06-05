@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 // RED (Wave 0): '@/lib/ordering' does not exist yet — these imports fail until Wave 1.
-import { computeReorderKey, parseQuantity } from '@/lib/ordering'
+import { computeReorderKey, parseQuantity, safeReorderKey, stepQuantityText } from '@/lib/ordering'
 import type { Item } from '@/types/item'
 
 /**
@@ -60,6 +60,73 @@ describe('parseQuantity (ITEM-03)', () => {
 
   it("'  5 ' -> 5 (trims surrounding whitespace)", () => {
     expect(parseQuantity('  5 ')).toBe(5)
+  })
+})
+
+describe('stepQuantityText (WR-02 — preserves free-text units)', () => {
+  it("'2 lbs' +1 -> '3 lbs' (preserves unit)", () => {
+    expect(stepQuantityText('2 lbs', 1)).toBe('3 lbs')
+  })
+
+  it("'2 lbs' -1 -> '1 lbs' (preserves unit, clamps floor)", () => {
+    expect(stepQuantityText('2 lbs', -1)).toBe('1 lbs')
+  })
+
+  it("'500g' -1 -> '499g' (no space before unit)", () => {
+    expect(stepQuantityText('500g', -1)).toBe('499g')
+  })
+
+  it("'3' +1 -> '4' (pure numeric)", () => {
+    expect(stepQuantityText('3', 1)).toBe('4')
+  })
+
+  it("'1' -1 -> '1' (clamps floor at 1)", () => {
+    expect(stepQuantityText('1', -1)).toBe('1')
+  })
+
+  it("null +1 -> '2' (blank parses to 1, steps to 2)", () => {
+    expect(stepQuantityText(null, 1)).toBe('2')
+  })
+
+  it("'a dozen' +1 -> '2 a dozen' (no leading int: keep text as unit)", () => {
+    expect(stepQuantityText('a dozen', 1)).toBe('2 a dozen')
+  })
+})
+
+describe('safeReorderKey (CR-02 / WR-05 — never throws on degenerate neighbors)', () => {
+  it('equal neighbors (before === after) does not throw and returns a key after before', () => {
+    const key = safeReorderKey('a0004', 'a0004')
+    expect(key).not.toBeNull()
+    expect(typeof key).toBe('string')
+    // Falls back to appending after `before` (after treated as null).
+    expect(key! > 'a0004').toBe(true)
+  })
+
+  it('unsorted neighbors (before > after) does not throw, appends after before', () => {
+    const key = safeReorderKey('a3', 'a1')
+    expect(key).not.toBeNull()
+    expect(key! > 'a3').toBe(true)
+  })
+
+  it('normal ordered neighbors returns a key strictly between', () => {
+    const key = safeReorderKey('a1', 'a3')
+    expect(key).not.toBeNull()
+    expect('a1' < key!).toBe(true)
+    expect(key! < 'a3').toBe(true)
+  })
+
+  it('invalid-order neighbor against backfill key does not throw', () => {
+    // generateKeyBetween('a','a0') throws "invalid order key: a" (WR-05 boundary).
+    // safeReorderKey must absorb this and still produce a usable key.
+    const key = safeReorderKey('a', 'a0')
+    expect(key).not.toBeNull()
+    expect(typeof key).toBe('string')
+  })
+
+  it('null/null returns a non-empty first key', () => {
+    const key = safeReorderKey(null, null)
+    expect(key).not.toBeNull()
+    expect(key!.length).toBeGreaterThan(0)
   })
 })
 

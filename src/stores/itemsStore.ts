@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { nanoid } from 'nanoid'
 import { supabase } from '@/lib/supabase'
-import { computeReorderKey, byPosition } from '@/lib/ordering'
+import { computeReorderKey, safeReorderKey, byPosition } from '@/lib/ordering'
 import type { Item } from '@/types/item'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -84,12 +84,24 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
     // Pitfall 3 / D-11: new rows get a position key appended AFTER the current max
     // so they sort to the end and are never null-position. computeReorderKey(max, null)
     // wraps generateKeyBetween; null currentMax yields the first key for an empty list.
-    const currentMax =
-      [...get().items]
-        .filter((i) => i.position != null)
-        .sort(byPosition)
-        .at(-1)?.position ?? null
-    const position = computeReorderKey(currentMax, null)
+    //
+    // WR-01: two near-simultaneous adds (both users at once — the core 2-user case — or
+    // a rapid double-tap permitted by the non-blocking duplicate warning) both read the
+    // same synchronous snapshot and mint the IDENTICAL key, which later bricks reordering
+    // (CR-02). Guard against it: collect every existing position, append past the current
+    // max, and if the freshly-minted key collides with one already present, keep appending
+    // past it until unique. Bounded loop — terminates as soon as no collision remains.
+    const positions = [...get().items]
+      .filter((i) => i.position != null)
+      .map((i) => i.position as string)
+      .sort()
+    const existing = new Set(positions)
+    let currentMax: string | null = positions.at(-1) ?? null
+    let position = computeReorderKey(currentMax, null)
+    while (existing.has(position)) {
+      currentMax = position
+      position = computeReorderKey(currentMax, null)
+    }
     const optimisticItem: Item = {
       id: tempId,
       list_id: listId,
@@ -203,16 +215,38 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
 
     const newCategory = target.category
 
-    // Neighbors in the TARGET category (sorted by position), excluding the dragged item.
-    // before/after are the drop-point boundaries; null at either end appends/prepends.
-    // computeReorderKey always receives (before, after) sorted with null at boundaries.
-    const inCat = get()
-      .items.filter((i) => i.category === newCategory && i.id !== activeId)
+    // Full sorted list of the TARGET category (including the dragged item) so we can
+    // derive DRAG DIRECTION (CR-01). dnd-kit's over.id carries no direction, so we
+    // compare the dragged item's current index against the drop-target index:
+    // dragging DOWN (active before over) inserts BELOW overId; dragging UP inserts ABOVE.
+    // WR-05: only consider rows with non-null positions when deriving neighbor keys, so
+    // legacy/null-position rows never feed a null/invalid neighbor into key computation.
+    const sorted = get()
+      .items.filter((i) => i.category === newCategory && i.position != null)
       .sort(byPosition)
-    const overIdx = inCat.findIndex((i) => i.id === overId)
-    const before = inCat[overIdx]?.position ?? null
-    const after = inCat[overIdx + 1]?.position ?? null
-    const newPosition = computeReorderKey(before, after)
+    const activeIdx = sorted.findIndex((i) => i.id === activeId)
+    const overIdxFull = sorted.findIndex((i) => i.id === overId)
+    // Default to inserting below when the active item is not in this category yet
+    // (cross-category drop): it has no current index here, so treat as "dropping onto".
+    const insertingBelow = activeIdx === -1 ? true : activeIdx < overIdxFull
+
+    const inCat = sorted.filter((i) => i.id !== activeId)
+    const overPos = inCat.findIndex((i) => i.id === overId)
+    const before = insertingBelow
+      ? inCat[overPos]?.position ?? null
+      : inCat[overPos - 1]?.position ?? null
+    const after = insertingBelow
+      ? inCat[overPos + 1]?.position ?? null
+      : inCat[overPos]?.position ?? null
+
+    // CR-02 / WR-06: tolerate degenerate (duplicate/unsorted/legacy) neighbor pairs.
+    // safeReorderKey never throws; it falls back to append, or returns null if no key
+    // can be computed — in which case surface the error rather than silently no-op.
+    const newPosition = safeReorderKey(before, after)
+    if (newPosition === null) {
+      set({ error: 'Failed to reorder item' })
+      return
+    }
 
     // Echo guard BEFORE the optimistic set so our own UPDATE echo is consumed (no flicker).
     pendingReorders.add(activeId)
