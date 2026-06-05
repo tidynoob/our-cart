@@ -39,6 +39,24 @@ vi.mock('@base-ui/react/checkbox', () => ({
   },
 }))
 
+// Mock @dnd-kit/sortable — useSortable is a no-op in jsdom (real drag cannot run).
+// The package is not installed until Plan 01; this factory returns plain objects so
+// no real import is needed (RED component tests still exercise note/stepper/swipe logic).
+vi.mock('@dnd-kit/sortable', () => ({
+  useSortable: () => ({
+    attributes: {},
+    listeners: {},
+    setNodeRef: () => {},
+    transform: null,
+    transition: undefined,
+  }),
+}))
+
+// Mock @dnd-kit/utilities (CSS.Transform.toString) so ItemRow's transform style compiles.
+vi.mock('@dnd-kit/utilities', () => ({
+  CSS: { Transform: { toString: () => undefined } },
+}))
+
 // Mock lucide-react icons
 vi.mock('lucide-react', async () => {
   const actual = await vi.importActual<typeof import('lucide-react')>('lucide-react')
@@ -49,6 +67,9 @@ vi.mock('lucide-react', async () => {
     ChevronDownIcon: () => <svg data-testid="chevron-down" />,
     CheckIcon: () => <svg data-testid="check-icon-select" />,
     ChevronUpIcon: () => <svg data-testid="chevron-up" />,
+    Minus: () => <svg data-testid="minus-icon" />,
+    Plus: () => <svg data-testid="plus-icon" />,
+    GripVertical: () => <svg data-testid="grip-icon" />,
   }
 })
 
@@ -92,7 +113,9 @@ const baseItem: Item = {
   added_by: 'Alice',
   user_id: null,
   created_at: new Date().toISOString(),
-}
+  note: null,
+  position: 'a1',
+} as Item
 
 const defaultProps = {
   item: baseItem,
@@ -217,5 +240,130 @@ describe('ItemRow — attribution from profilesStore (PROF-04/PROF-05/D-04)', ()
     render(<ItemRow {...defaultProps} item={unknownItem} />)
     // No profile, no added_by → ? div
     expect(screen.getByLabelText('Unknown person added this')).toBeTruthy()
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// RED (Wave 0, ITEM-01/03/05): note display/edit, quantity stepper clamp,
+// swipe-to-delete reveal. The note/stepper/swipe UI does not exist on ItemRow
+// yet — these queries fail until the UI lands (Wave 1/2). useSortable is mocked
+// to a no-op above (jsdom cannot run a real drag).
+// ──────────────────────────────────────────────────────────────────────────
+
+describe('ItemRow — note display (ITEM-01)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useProfilesStore.setState({ profiles: {}, channel: null })
+  })
+
+  it('renders the note as a plain escaped text node under the name (no dangerouslySetInnerHTML)', () => {
+    const item: Item = { ...baseItem, note: 'organic' }
+    render(<ItemRow {...defaultProps} item={item} />)
+
+    // Note text is queryable as a text node (JSX auto-escapes; XSS guard).
+    const noteEl = screen.getByText('organic')
+    expect(noteEl).toBeTruthy()
+    // No element in the row uses dangerouslySetInnerHTML for the note.
+    expect(noteEl.innerHTML).toBe('organic')
+  })
+
+  it('renders NO note line when item.note is null', () => {
+    render(<ItemRow {...defaultProps} item={{ ...baseItem, note: null }} />)
+    expect(screen.queryByText('organic')).toBeNull()
+  })
+})
+
+describe('ItemRow — quantity stepper (ITEM-03)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useProfilesStore.setState({ profiles: {}, channel: null })
+  })
+
+  it('decrease control is DISABLED at quantity 1 (clamp floor)', () => {
+    render(<ItemRow {...defaultProps} item={{ ...baseItem, quantity: '1' }} />)
+    const dec = screen.getByLabelText('Decrease quantity') as HTMLButtonElement
+    expect(dec.disabled).toBe(true)
+  })
+
+  it('increase from quantity 3 saves quantity "4"', () => {
+    render(<ItemRow {...defaultProps} item={{ ...baseItem, quantity: '3' }} />)
+    const inc = screen.getByLabelText('Increase quantity')
+    fireEvent.click(inc)
+    expect(defaultProps.onSave).toHaveBeenCalledWith('item-1', { quantity: '4' })
+  })
+
+  it('decrease from quantity 3 saves quantity "2"', () => {
+    render(<ItemRow {...defaultProps} item={{ ...baseItem, quantity: '3' }} />)
+    const dec = screen.getByLabelText('Decrease quantity')
+    fireEvent.click(dec)
+    expect(defaultProps.onSave).toHaveBeenCalledWith('item-1', { quantity: '2' })
+  })
+
+  it('clicking a stepper button does NOT open edit mode (stopPropagation)', () => {
+    render(<ItemRow {...defaultProps} item={{ ...baseItem, quantity: '3' }} />)
+    fireEvent.click(screen.getByLabelText('Increase quantity'))
+    expect(defaultProps.onTap).not.toHaveBeenCalled()
+  })
+})
+
+describe('ItemRow — note edit (ITEM-01)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useProfilesStore.setState({ profiles: {}, channel: null })
+  })
+
+  it('edit mode shows a Note input with the optional placeholder', () => {
+    render(<ItemRow {...defaultProps} isEditing={true} />)
+    const noteInput = screen.getByLabelText('Note') as HTMLInputElement
+    expect(noteInput).toBeTruthy()
+    expect(noteInput.placeholder).toBe('Add a note (optional)')
+  })
+
+  it('typing a note and blurring saves the note through onSave', () => {
+    render(<ItemRow {...defaultProps} isEditing={true} />)
+    const noteInput = screen.getByLabelText('Note')
+    fireEvent.change(noteInput, { target: { value: 'the green box' } })
+    fireEvent.blur(noteInput)
+    // Save path receives the new note (focus-scope save fires on blur out of row).
+    expect(defaultProps.onSave).toHaveBeenCalledWith(
+      'item-1',
+      expect.objectContaining({ note: 'the green box' }),
+    )
+  })
+})
+
+describe('ItemRow — swipe-to-delete reveal (ITEM-05)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useProfilesStore.setState({ profiles: {}, channel: null })
+  })
+
+  // jsdom has no real Pointer Events / layout — exercise the LOGIC via synthetic
+  // pointer events with clientX deltas, not real touch physics (see 13-VALIDATION jsdom note).
+  it('swipe-left past the 64px threshold reveals a Delete affordance; tapping it deletes', () => {
+    render(<ItemRow {...defaultProps} />)
+    const row = screen.getByText('Milk').closest('[data-swipe-row]') as HTMLElement
+    expect(row).not.toBeNull()
+
+    fireEvent.pointerDown(row, { clientX: 200, pointerId: 1 })
+    fireEvent.pointerMove(row, { clientX: 120, pointerId: 1 }) // -80px > 64px threshold
+    fireEvent.pointerUp(row, { clientX: 120, pointerId: 1 })
+
+    const del = screen.getByText('Delete')
+    expect(del).toBeTruthy()
+    fireEvent.click(del)
+    expect(defaultProps.onDelete).toHaveBeenCalled()
+  })
+
+  it('a short swipe (<64px) snaps back and reveals no Delete affordance', () => {
+    render(<ItemRow {...defaultProps} />)
+    const row = screen.getByText('Milk').closest('[data-swipe-row]') as HTMLElement
+    expect(row).not.toBeNull()
+
+    fireEvent.pointerDown(row, { clientX: 200, pointerId: 1 })
+    fireEvent.pointerMove(row, { clientX: 180, pointerId: 1 }) // -20px < 64px threshold
+    fireEvent.pointerUp(row, { clientX: 180, pointerId: 1 })
+
+    expect(screen.queryByText('Delete')).toBeNull()
   })
 })

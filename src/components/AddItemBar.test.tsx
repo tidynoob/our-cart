@@ -6,6 +6,9 @@ import { AddItemBar } from './AddItemBar'
 // Module-level mock data and mock functions
 let mockSuggestionData: Array<{ name: string; category: string | null; quantity: string | null }> = []
 const mockAddItem = vi.fn()
+// Live store items the AddItemBar reads via useItemsStore(s => s.items) for the
+// ITEM-04 duplicate warning. Per-test controllable (name + checked flag).
+let mockStoreItems: Array<{ name: string; checked: boolean }> = []
 
 // Mock Supabase with 4-level chain: from -> select -> eq -> order
 vi.mock('@/lib/supabase', () => ({
@@ -21,10 +24,13 @@ vi.mock('@/lib/supabase', () => ({
   },
 }))
 
-// Mock itemsStore — useItemsStore selector pattern
+// Mock itemsStore — useItemsStore selector pattern.
+// Widened to also expose `items` so Plan 04's `useItemsStore(s => s.items)`
+// resolves (without this, `items.some(...)` throws TypeError instead of clean RED).
 vi.mock('@/stores/itemsStore', () => ({
-  useItemsStore: (selector: (state: { addItem: typeof mockAddItem }) => unknown) =>
-    selector({ addItem: mockAddItem }),
+  useItemsStore: (
+    selector: (state: { addItem: typeof mockAddItem; items: typeof mockStoreItems }) => unknown,
+  ) => selector({ addItem: mockAddItem, items: mockStoreItems }),
 }))
 
 // Mock @base-ui/react/checkbox (same as ItemRow.test.tsx)
@@ -293,5 +299,56 @@ describe('AddItemBar tap targets', () => {
     expect(moreBtn.className).toContain('min-h-[44px]')
     expect(moreBtn.className).toContain('flex')
     expect(moreBtn.className).toContain('items-center')
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// RED (Wave 0, ITEM-04): live duplicate warning. The warning UI does not exist
+// on AddItemBar yet — these queries fail until it lands (Plan 04). The contract:
+// case-insensitive match against UNCHECKED store items, role="status", and the
+// Add submit button stays ENABLED (non-blocking, D-15).
+// ──────────────────────────────────────────────────────────────────────────
+describe('AddItemBar — duplicate warning (ITEM-04)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockSuggestionData = []
+    mockStoreItems = []
+  })
+
+  it('shows a role="status" warning for a case-insensitive unchecked match AND keeps Add enabled', async () => {
+    mockStoreItems = [{ name: 'Milk', checked: false }]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    const input = screen.getByPlaceholderText('Add an item...')
+    await user.type(input, 'milk') // different case than the stored 'Milk'
+
+    const warning = await screen.findByRole('status')
+    expect(warning.textContent).toContain('already on your list')
+    expect(warning.textContent).toContain('milk')
+
+    // Non-blocking: the Add submit button stays enabled.
+    const submitButton = screen.getByRole('button', { name: 'Add item' }) as HTMLButtonElement
+    expect(submitButton.disabled).toBe(false)
+  })
+
+  it('shows NO warning when the only match is CHECKED (unchecked-only)', async () => {
+    mockStoreItems = [{ name: 'Milk', checked: true }]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    await user.type(screen.getByPlaceholderText('Add an item...'), 'milk')
+
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('shows NO warning when the typed name does not match any item', async () => {
+    mockStoreItems = [{ name: 'Milk', checked: false }]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    await user.type(screen.getByPlaceholderText('Add an item...'), 'eggs')
+
+    expect(screen.queryByRole('status')).toBeNull()
   })
 })
