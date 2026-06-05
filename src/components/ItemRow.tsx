@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Trash2 } from 'lucide-react'
+import { Trash2, Minus, Plus } from 'lucide-react'
 import type { Item } from '@/types/item'
+import { parseQuantity } from '@/lib/ordering'
 import { AttributionBadge } from '@/components/AttributionBadge'
 import { DeleteConfirmation } from '@/components/DeleteConfirmation'
 import { Input } from '@/components/ui/input'
@@ -26,7 +27,10 @@ interface ItemRowProps {
   onCancelDelete: () => void
   onConfirmDelete: () => void
   onCancelEdit: () => void
-  onSave: (id: string, changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>) => void
+  onSave: (
+    id: string,
+    changes: Partial<Pick<Item, 'name' | 'quantity' | 'category' | 'note' | 'position'>>
+  ) => void
   onToggle: (id: string) => void
 }
 
@@ -69,6 +73,7 @@ export function ItemRow({
   const [editName, setEditName] = useState('')
   const [editQuantity, setEditQuantity] = useState('')
   const [editCategory, setEditCategory] = useState('')
+  const [editNote, setEditNote] = useState('')
 
   // Initialize local edit state when entering edit mode
   useEffect(() => {
@@ -76,8 +81,9 @@ export function ItemRow({
       setEditName(item.name)
       setEditQuantity(item.quantity || '')
       setEditCategory(item.category || '')
+      setEditNote(item.note ?? '')
     }
-  }, [isEditing, item.name, item.quantity, item.category])
+  }, [isEditing, item.name, item.quantity, item.category, item.note])
 
   /**
    * DIRTY-CHECK before calling onSave (addresses review concern about redundant updates).
@@ -95,21 +101,26 @@ export function ItemRow({
 
     const newQuantity = editQuantity.trim() || null
     const newCategory = editCategory || null
+    const newNote = editNote.trim() || null
 
     const nameChanged = trimmedName !== item.name
     const quantityChanged = newQuantity !== item.quantity
     const categoryChanged = newCategory !== item.category
+    const noteChanged = newNote !== item.note
 
-    if (nameChanged || quantityChanged || categoryChanged) {
-      const changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>> = {}
+    if (nameChanged || quantityChanged || categoryChanged || noteChanged) {
+      const changes: Partial<
+        Pick<Item, 'name' | 'quantity' | 'category' | 'note' | 'position'>
+      > = {}
       if (nameChanged) changes.name = trimmedName
       if (quantityChanged) changes.quantity = newQuantity
       if (categoryChanged) changes.category = newCategory
+      if (noteChanged) changes.note = newNote
       onSave(item.id, changes)
     } else {
       onCancelEdit()
     }
-  }, [editName, editQuantity, editCategory, item, onSave, onCancelEdit])
+  }, [editName, editQuantity, editCategory, editNote, item, onSave, onCancelEdit])
 
   /**
    * Focus-scope blur handler: uses setTimeout(0) to let the browser complete
@@ -219,6 +230,16 @@ export function ItemRow({
             Cancel
           </Button>
         </div>
+        {/* Row 3: Note input (ITEM-01 / D-04) — single-line, ≥16px, saves via handleSave */}
+        <Input
+          type="text"
+          value={editNote}
+          onChange={(e) => setEditNote(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Add a note (optional)"
+          className="min-h-[40px] flex-1 text-base"
+          aria-label="Note"
+        />
       </div>
     )
   }
@@ -280,14 +301,54 @@ export function ItemRow({
         )
       })()}
 
-      {/* Name — conditional strikethrough per D-05 */}
-      <span className={cn('flex-1 text-base', item.checked && 'line-through')}>
-        {item.name}
-      </span>
+      {/* Name + note (stacked) — conditional strikethrough per D-05.
+          Note (ITEM-01) renders as an escaped JSX text node ONLY — never
+          dangerouslySetInnerHTML (stored-XSS guard, RESEARCH §V5). */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <span className={cn('text-base', item.checked && 'line-through')}>
+          {item.name}
+        </span>
+        {item.note && (
+          <span className="truncate text-sm text-muted-foreground">{item.note}</span>
+        )}
+      </div>
 
-      {item.quantity && (
-        <span className="text-sm text-muted-foreground">{item.quantity}</span>
-      )}
+      {/* Quantity stepper (ITEM-03 / D-12/D-13) — replaces the plain quantity span.
+          parseQuantity normalizes free text → leading int; − disabled at 1.
+          Both buttons stopPropagation so a tap never opens edit mode. */}
+      {(() => {
+        const qty = parseQuantity(item.quantity)
+        return (
+          <div className="flex shrink-0 items-center">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11"
+              disabled={qty <= 1}
+              aria-label="Decrease quantity"
+              onClick={(e) => {
+                e.stopPropagation()
+                onSave(item.id, { quantity: String(Math.max(1, qty - 1)) })
+              }}
+            >
+              <Minus className="size-5 text-muted-foreground" />
+            </Button>
+            <span className="w-6 text-center text-base tabular-nums">{qty}</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11"
+              aria-label="Increase quantity"
+              onClick={(e) => {
+                e.stopPropagation()
+                onSave(item.id, { quantity: String(qty + 1) })
+              }}
+            >
+              <Plus className="size-5 text-muted-foreground" />
+            </Button>
+          </div>
+        )
+      })()}
     </div>
   )
 }
