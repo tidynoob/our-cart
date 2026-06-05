@@ -83,6 +83,10 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       added_by: addedBy || null,
       user_id: userId ?? null,
       created_at: new Date().toISOString(),
+      // Plan 01 spine: new rows start position-null (created_at fallback handles
+      // ordering); Plan 02 wires generateKeyBetween(currentMax, null) on insert.
+      note: null,
+      position: null,
     }
 
     // Optimistic add — append to items array and track temp ID for dedup (CR-01)
