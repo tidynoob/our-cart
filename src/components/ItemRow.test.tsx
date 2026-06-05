@@ -367,3 +367,124 @@ describe('ItemRow — swipe-to-delete reveal (ITEM-05)', () => {
     expect(screen.queryByText('Delete')).toBeNull()
   })
 })
+
+// ──────────────────────────────────────────────────────────────────────────
+// Phase 13 gap-closure (13-05 / ITEM-05): desktop-mouse interaction regression.
+//
+// jsdom CONSTRAINT (see 13-05-PLAN <objective>): jsdom has NO paint-order /
+// opaque-overlay hit-testing and NO real setPointerCapture move routing.
+// fireEvent.click dispatches directly on the target element. The real-device
+// symptoms (mouse hover dragging the row via pointer capture; the opaque
+// foreground physically stealing the Delete click) CANNOT be reproduced as RED
+// in jsdom by replaying clicks. These tests are deliberately anchored on
+// observable, deterministic proxies for the fix MECHANISM: the press-gate's
+// early-return effect on dx, and the structural z-index / pointer-events classes
+// that are the literal mechanism closing Defect B. The on-device human re-test
+// (13-HUMAN-UAT.md tests 2 & 3, real desktop mouse) remains the FINAL gate.
+// ──────────────────────────────────────────────────────────────────────────
+describe('ItemRow — desktop-mouse interaction regression (UAT gaps 1+2)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useProfilesStore.setState({ profiles: {}, channel: null })
+  })
+
+  // Test A — a NEGATIVE-delta move with NO active press (no button held) must be
+  // ignored by the press-gate. We SEED a non-zero swipeStartX via a down/up cycle
+  // (so the press is released, dx still 0), then fire a negative move with
+  // buttons:0 — on broken code this translates the row (RED); after the gate it
+  // early-returns and dx stays 0 (GREEN).
+  it('negative-delta pointermove with NO active press is ignored (press-gate)', () => {
+    render(<ItemRow {...defaultProps} />)
+    const row = screen.getByText('Milk').closest('[data-swipe-row]') as HTMLElement
+    expect(row).not.toBeNull()
+
+    // 1. Seed swipeStartX.current = 200, mark press; 2. release press (dx still 0).
+    fireEvent.pointerDown(row, { clientX: 200, pointerId: 1, buttons: 1 })
+    fireEvent.pointerUp(row, { clientX: 200, pointerId: 1, buttons: 0 })
+    // 3. Negative move (delta = 120 - 200 = -80) but NO active press, buttons:0.
+    fireEvent.pointerMove(row, { clientX: 120, pointerId: 1, buttons: 0 })
+
+    // GREEN: the gate early-returns → dx stays 0 → transform unset/translateX(0px).
+    const transform = (row as HTMLElement).style.transform
+    expect(transform === '' || transform === 'translateX(0px)').toBe(true)
+    expect(screen.queryByText('Delete')).toBeNull()
+  })
+
+  // Test B — a SUB-THRESHOLD offset (revealed=false) snaps back to 0 on
+  // pointerleave/pointercancel when no press is active. Locked rule: on
+  // cancel/leave with no active press — if revealed is false, snap dx→0; if
+  // revealed is true, leave the committed reveal intact. Here the -30px offset
+  // never crosses the 64px reveal threshold, so revealed=false → deterministic
+  // snap-to-0. Parametrized across pointerLeave and pointerCancel.
+  it.each(['pointerLeave', 'pointerCancel'] as const)(
+    'sub-threshold offset snaps back to 0 on %s with no active press',
+    (endEvent) => {
+      render(<ItemRow {...defaultProps} />)
+      const row = screen.getByText('Milk').closest('[data-swipe-row]') as HTMLElement
+      expect(row).not.toBeNull()
+
+      fireEvent.pointerDown(row, { clientX: 200, pointerId: 1, buttons: 1 })
+      // delta = 170 - 200 = -30, UNDER the 64px reveal threshold → dx≈-30, revealed=false.
+      fireEvent.pointerMove(row, { clientX: 170, pointerId: 1, buttons: 1 })
+
+      // pointerleave / pointercancel with no button held → snap a sub-threshold offset back.
+      fireEvent[endEvent](row, { clientX: 170, pointerId: 1, buttons: 0 })
+
+      const transform = (row as HTMLElement).style.transform
+      expect(transform === '' || transform === 'translateX(0px)').toBe(true)
+      expect(screen.queryByText('Delete')).toBeNull()
+    },
+  )
+
+  // Test C — the checkbox stays operable after a swipe offset exists (regression
+  // guard). jsdom dispatches the checkbox click directly, so this is GREEN-ish on
+  // current code via the existing stopPropagation wrapper; it exists to catch a
+  // REGRESSION if Task 2's pointer-events change accidentally makes the checkbox
+  // inert. It is NOT the RED→GREEN signal.
+  it('checkbox stays operable after a swipe offset (toggles, does not open edit)', () => {
+    render(<ItemRow {...defaultProps} />)
+    const row = screen.getByText('Milk').closest('[data-swipe-row]') as HTMLElement
+    expect(row).not.toBeNull()
+
+    // Create a sub-threshold offset (-25px).
+    fireEvent.pointerDown(row, { clientX: 200, pointerId: 1, buttons: 1 })
+    fireEvent.pointerMove(row, { clientX: 175, pointerId: 1, buttons: 1 })
+
+    fireEvent.click(screen.getByRole('checkbox'))
+
+    expect(defaultProps.onToggle).toHaveBeenCalledWith('item-1')
+    expect(defaultProps.onTap).not.toHaveBeenCalled()
+  })
+
+  // Test D — revealed-Delete overlay MECHANISM. The structural classes that close
+  // Defect B: the revealed Delete wrapper paints above the translated foreground
+  // (z-10) AND the foreground is pointer-events-none while revealed. jsdom cannot
+  // reproduce the on-device overlay hit-steal; this asserts the structural
+  // z-index/pointer-events mechanism instead. The real gate is 13-HUMAN-UAT.md
+  // tests 2 & 3 on a real desktop mouse.
+  it('revealed Delete wrapper is z-raised and foreground is pointer-events-none (Defect B mechanism)', () => {
+    render(<ItemRow {...defaultProps} />)
+    const row = screen.getByText('Milk').closest('[data-swipe-row]') as HTMLElement
+    expect(row).not.toBeNull()
+
+    // Full reveal: -80px past the 64px threshold.
+    fireEvent.pointerDown(row, { clientX: 200, pointerId: 1, buttons: 1 })
+    fireEvent.pointerMove(row, { clientX: 120, pointerId: 1, buttons: 1 })
+    fireEvent.pointerUp(row, { clientX: 120, pointerId: 1, buttons: 0 })
+
+    // 1. RED→GREEN signal: structural classes (asserted FIRST).
+    // The revealed Delete WRAPPER carries a raised z-index (z-10+).
+    const deleteWrapper = screen.getByText('Delete').closest('[class*="absolute"]') as HTMLElement
+    expect(deleteWrapper).not.toBeNull()
+    expect(deleteWrapper.className).toContain('z-10')
+
+    // The translated FOREGROUND carries pointer-events-none WHILE revealed.
+    expect((row as HTMLElement).className).toContain('pointer-events-none')
+
+    // 2. Non-RED guard (GREEN throughout via jsdom direct dispatch): Delete still
+    //    routes to onDelete and never opens edit.
+    fireEvent.click(screen.getByText('Delete'))
+    expect(defaultProps.onDelete).toHaveBeenCalled()
+    expect(defaultProps.onTap).not.toHaveBeenCalled()
+  })
+})
