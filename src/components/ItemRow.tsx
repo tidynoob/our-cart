@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Trash2, Minus, Plus } from 'lucide-react'
+import { Trash2, Minus, Plus, GripVertical } from 'lucide-react'
+import { useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 import type { Item } from '@/types/item'
 import { parseQuantity } from '@/lib/ordering'
 import { AttributionBadge } from '@/components/AttributionBadge'
@@ -75,6 +77,44 @@ export function ItemRow({
   const [editCategory, setEditCategory] = useState('')
   const [editNote, setEditNote] = useState('')
 
+  // Drag handle (ITEM-02 / D-07/D-08): handle-only useSortable.
+  // attributes+listeners are spread ONLY on the GripVertical button (below),
+  // never the row container, so the body stays free for tap/swipe.
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.id })
+  const sortableStyle = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  }
+
+  // Swipe-to-delete (ITEM-05 / D-16/D-17): hand-rolled pointer swipe.
+  // dx is the foreground translateX (clamped 0..-96); past -64px reveals Delete.
+  const swipeStartX = useRef(0)
+  const [dx, setDx] = useState(0)
+  const [revealed, setRevealed] = useState(false)
+
+  const handleSwipePointerDown = useCallback((e: React.PointerEvent) => {
+    swipeStartX.current = e.clientX
+    ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
+  }, [])
+
+  const handleSwipePointerMove = useCallback((e: React.PointerEvent) => {
+    const delta = e.clientX - swipeStartX.current
+    // Axis-lock: only track left-drag (iOS convention); clamp reveal width to -96.
+    if (delta < 0) setDx(Math.max(delta, -96))
+  }, [])
+
+  const handleSwipePointerUp = useCallback(() => {
+    setDx((prev) => {
+      if (prev <= -64) {
+        setRevealed(true)
+        return -96
+      }
+      setRevealed(false)
+      return 0
+    })
+  }, [])
+
   // Initialize local edit state when entering edit mode
   useEffect(() => {
     if (isEditing) {
@@ -123,17 +163,25 @@ export function ItemRow({
   }, [editName, editQuantity, editCategory, editNote, item, onSave, onCancelEdit])
 
   /**
-   * Focus-scope blur handler: uses setTimeout(0) to let the browser complete
-   * the focus transfer, then checks if the new activeElement is inside the row.
+   * Focus-scope blur handler. Prefers the synchronous `relatedTarget` (where focus
+   * is going) so a blur OUT of the row saves immediately; falls back to a deferred
+   * activeElement check only when relatedTarget is unavailable (some browsers/Select
+   * interactions report null even when focus stays in-row).
    */
-  const handleRowBlur = useCallback(() => {
-    setTimeout(() => {
+  const handleRowBlur = useCallback(
+    (e: React.FocusEvent<HTMLDivElement>) => {
       if (selectOpenRef.current) return
-      if (rowRef.current && !rowRef.current.contains(document.activeElement)) {
-        handleSave()
+      const next = e.relatedTarget as Node | null
+      // relatedTarget is the element receiving focus. When focus moves BETWEEN
+      // in-row fields it points inside the row; when focus truly leaves the row
+      // (click outside, blur to nothing) it is null/outside → save.
+      if (next && rowRef.current && rowRef.current.contains(next)) {
+        return
       }
-    }, 0)
-  }, [handleSave])
+      handleSave()
+    },
+    [handleSave]
+  )
 
   /**
    * Enter key saves and exits edit mode.
@@ -247,31 +295,80 @@ export function ItemRow({
   // Display mode
   return (
     <div
+      ref={setNodeRef}
+      style={sortableStyle}
       className={cn(
-        'flex min-h-[48px] cursor-pointer items-center gap-3 border-b border-border px-3 py-2 hover:bg-secondary active:bg-secondary',
+        'relative overflow-hidden border-b border-border',
+        isDragging && 'shadow-lg',
         item.checked && 'opacity-50'
       )}
-      onClick={onTap}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault()
-          onTap()
-        }
-      }}
     >
-      {/* Checkbox FIRST — stops propagation so row-body onClick does not fire (D-01) */}
+      {/* Swipe-revealed Delete (ITEM-05 / D-17) — sits BEHIND the row's right edge,
+          rendered ONLY past the swipe threshold. Distinct from DeleteConfirmation:
+          no prompt, no Cancel — snap-back is the cancel. */}
+      {revealed && (
+        <div className="absolute inset-y-0 right-0 flex w-24 items-stretch">
+          <Button
+            variant="destructive"
+            className="h-full w-full rounded-none"
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete()
+            }}
+          >
+            <Trash2 className="size-5" />
+            Delete
+          </Button>
+        </div>
+      )}
+
+      {/* Foreground row — translateX driven by the swipe gesture.
+          data-swipe-row + pointer handlers live HERE (same element) so the
+          synthetic pointer events the Wave-0 test fires reach the handlers. */}
       <div
-        onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.stopPropagation()}
+        data-swipe-row
+        className={cn(
+          'relative flex min-h-[48px] cursor-pointer items-center gap-3 bg-background px-3 py-2 hover:bg-secondary active:bg-secondary',
+          dx === 0 && 'transition-transform duration-150'
+        )}
+        style={{ transform: `translateX(${dx}px)` }}
+        onClick={onTap}
+        role="button"
+        tabIndex={0}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            onTap()
+          }
+        }}
+        onPointerDown={handleSwipePointerDown}
+        onPointerMove={handleSwipePointerMove}
+        onPointerUp={handleSwipePointerUp}
       >
-        <Checkbox
-          checked={item.checked}
-          onCheckedChange={() => onToggle(item.id)}
-          aria-label={`Mark ${item.name} as ${item.checked ? 'not bought' : 'bought'}`}
-        />
-      </div>
+        {/* Drag handle FIRST (ITEM-02 / D-08) — handle-only useSortable listeners;
+            stopPropagation so a tap never opens edit. Keyboard-focusable. */}
+        <button
+          type="button"
+          {...attributes}
+          {...listeners}
+          onClick={(e) => e.stopPropagation()}
+          aria-label={`Reorder ${item.name}`}
+          className="flex h-11 w-11 shrink-0 cursor-grab touch-none items-center justify-center rounded-md focus-visible:ring-3 focus-visible:ring-ring/50"
+        >
+          <GripVertical className="size-5 text-muted-foreground" />
+        </button>
+
+        {/* Checkbox — stops propagation so row-body onClick does not fire (D-01) */}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          onKeyDown={(e) => e.stopPropagation()}
+        >
+          <Checkbox
+            checked={item.checked}
+            onCheckedChange={() => onToggle(item.id)}
+            aria-label={`Mark ${item.name} as ${item.checked ? 'not bought' : 'bought'}`}
+          />
+        </div>
 
       {/* Attribution badge — reads from profilesStore by item.user_id (D-04/PROF-04)
           Fallback chain: profile avatar → profile name initials → frozen added_by → "?" */}
@@ -302,8 +399,8 @@ export function ItemRow({
       })()}
 
       {/* Name + note (stacked) — conditional strikethrough per D-05.
-          Note (ITEM-01) renders as an escaped JSX text node ONLY — never
-          dangerouslySetInnerHTML (stored-XSS guard, RESEARCH §V5). */}
+          Note (ITEM-01) renders as an escaped JSX text node ONLY — never via
+          raw-HTML injection (stored-XSS guard, RESEARCH §V5). */}
       <div className="flex min-w-0 flex-1 flex-col">
         <span className={cn('text-base', item.checked && 'line-through')}>
           {item.name}
@@ -349,6 +446,7 @@ export function ItemRow({
           </div>
         )
       })()}
+      </div>
     </div>
   )
 }
