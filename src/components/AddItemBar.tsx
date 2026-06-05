@@ -31,6 +31,8 @@ interface AddItemBarProps {
  */
 export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
   const addItem = useItemsStore((state) => state.addItem)
+  // Live store items for the non-blocking duplicate warning (ITEM-04 / D-14).
+  const items = useItemsStore((state) => state.items)
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState('')
   const [category, setCategory] = useState('')
@@ -113,6 +115,16 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
   // The form is inert while submitting — prevents double-submit.
   const isInert = submitting
 
+  // Live duplicate warning (ITEM-04 / D-14): unchecked-only, case-insensitive
+  // match against the current store items. Informational only — does NOT gate
+  // submit (D-15). XSS-safe: the typed name is rendered via JSX text interpolation
+  // (React auto-escapes; T-13-V5), never raw HTML.
+  const dupExists =
+    name.trim().length > 0 &&
+    items.some(
+      (i) => !i.checked && i.name.toLowerCase() === name.trim().toLowerCase()
+    )
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
 
@@ -178,6 +190,15 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
           />
         )}
       </div>
+
+      {/* Live duplicate warning (ITEM-04) — non-blocking, amber (informational,
+          NOT destructive red). role="status" is a polite live region (no focus
+          theft). Add stays enabled; the form's flex-col gap-2 reserves the line. */}
+      {dupExists && (
+        <p role="status" className="text-sm text-amber-600">
+          "{name.trim()}" is already on your list
+        </p>
+      )}
 
       <button
         type="button"
