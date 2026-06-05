@@ -3,7 +3,7 @@ import { Trash2, Minus, Plus, GripVertical } from 'lucide-react'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { Item } from '@/types/item'
-import { parseQuantity } from '@/lib/ordering'
+import { parseQuantity, stepQuantityText } from '@/lib/ordering'
 import { AttributionBadge } from '@/components/AttributionBadge'
 import { DeleteConfirmation } from '@/components/DeleteConfirmation'
 import { Input } from '@/components/ui/input'
@@ -99,16 +99,25 @@ export function ItemRow({
   // Swipe-to-delete (ITEM-05 / D-16/D-17): hand-rolled pointer swipe.
   // dx is the foreground translateX (clamped 0..-96); past -64px reveals Delete.
   const swipeStartX = useRef(0)
+  // WR-04: track whether the pointer moved beyond an 8px slop between down and up.
+  // If it did, the trailing synthetic `click` is a swipe artifact, not a tap — we
+  // suppress onTap so a snap-back swipe never accidentally opens edit mode.
+  const swipeMoved = useRef(false)
   const [dx, setDx] = useState(0)
   const [revealed, setRevealed] = useState(false)
 
+  const SWIPE_SLOP = 8
+
   const handleSwipePointerDown = useCallback((e: React.PointerEvent) => {
     swipeStartX.current = e.clientX
+    swipeMoved.current = false
     ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
   }, [])
 
   const handleSwipePointerMove = useCallback((e: React.PointerEvent) => {
     const delta = e.clientX - swipeStartX.current
+    // WR-04: mark as moved once past the slop threshold (either direction).
+    if (Math.abs(delta) > SWIPE_SLOP) swipeMoved.current = true
     // Axis-lock: only track left-drag (iOS convention); clamp reveal width to -96.
     if (delta < 0) setDx(Math.max(delta, -96))
   }, [])
@@ -123,6 +132,32 @@ export function ItemRow({
       return 0
     })
   }, [])
+
+  // WR-03/WR-04: row-body tap handler. A tap while the Delete affordance is revealed
+  // dismisses it (snap-back) instead of opening edit — never two affordances at once.
+  // A tap whose pointer crossed the swipe slop is a swipe artifact and is ignored.
+  const handleRowTap = useCallback(() => {
+    if (swipeMoved.current) {
+      swipeMoved.current = false
+      return
+    }
+    if (revealed) {
+      setDx(0)
+      setRevealed(false)
+      return
+    }
+    onTap()
+  }, [revealed, onTap])
+
+  // WR-03: reset swipe state when entering edit mode so the row does not re-render
+  // translated/revealed on edit exit. Without this, dx/-96 + revealed persist across
+  // the edit-mode early return and leak back into display mode.
+  useEffect(() => {
+    if (isEditing) {
+      setDx(0)
+      setRevealed(false)
+    }
+  }, [isEditing])
 
   // Initialize local edit state when entering edit mode
   useEffect(() => {
@@ -341,13 +376,13 @@ export function ItemRow({
           dx === 0 && 'transition-transform duration-150'
         )}
         style={{ transform: `translateX(${dx}px)` }}
-        onClick={onTap}
+        onClick={handleRowTap}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
-            onTap()
+            handleRowTap()
           }
         }}
         onPointerDown={handleSwipePointerDown}
@@ -420,7 +455,9 @@ export function ItemRow({
       </div>
 
       {/* Quantity stepper (ITEM-03 / D-12/D-13) — replaces the plain quantity span.
-          parseQuantity normalizes free text → leading int; − disabled at 1.
+          parseQuantity normalizes free text → leading int for DISPLAY; stepQuantityText
+          PRESERVES the trailing unit when writing back ("2 lbs" → "3 lbs"), so a single
+          tap never silently destroys free-text units (WR-02). − disabled at 1.
           Both buttons stopPropagation so a tap never opens edit mode. */}
       {(() => {
         const qty = parseQuantity(item.quantity)
@@ -434,7 +471,7 @@ export function ItemRow({
               aria-label="Decrease quantity"
               onClick={(e) => {
                 e.stopPropagation()
-                stepQuantity(item.id, String(Math.max(1, qty - 1)))
+                stepQuantity(item.id, stepQuantityText(item.quantity, -1))
               }}
             >
               <Minus className="size-5 text-muted-foreground" />
@@ -447,7 +484,7 @@ export function ItemRow({
               aria-label="Increase quantity"
               onClick={(e) => {
                 e.stopPropagation()
-                stepQuantity(item.id, String(qty + 1))
+                stepQuantity(item.id, stepQuantityText(item.quantity, 1))
               }}
             >
               <Plus className="size-5 text-muted-foreground" />
