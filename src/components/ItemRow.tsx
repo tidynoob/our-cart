@@ -99,6 +99,10 @@ export function ItemRow({
   // Swipe-to-delete (ITEM-05 / D-16/D-17): hand-rolled pointer swipe.
   // dx is the foreground translateX (clamped 0..-96); past -64px reveals Delete.
   const swipeStartX = useRef(0)
+  // Defect A (13-05): track whether a pointer press is actively held. A bare
+  // pointermove with no button down (desktop mouse hover) must NOT translate the
+  // row. handleSwipePointerMove early-returns unless isPressed (or e.buttons & 1).
+  const isPressed = useRef(false)
   // WR-04: track whether the pointer moved beyond an 8px slop between down and up.
   // If it did, the trailing synthetic `click` is a swipe artifact, not a tap — we
   // suppress onTap so a snap-back swipe never accidentally opens edit mode.
@@ -109,12 +113,18 @@ export function ItemRow({
   const SWIPE_SLOP = 8
 
   const handleSwipePointerDown = useCallback((e: React.PointerEvent) => {
+    isPressed.current = true
     swipeStartX.current = e.clientX
     swipeMoved.current = false
+    // Keep capture so an in-progress drag tracks off-element, but the isPressed
+    // gate (not capture) decides whether a move counts.
     ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
   }, [])
 
   const handleSwipePointerMove = useCallback((e: React.PointerEvent) => {
+    // Defect A gate: ignore moves that are not part of an active press. A desktop
+    // mouse hover (buttons=0, no prior pointerdown) must never drag the row.
+    if (!isPressed.current && !(e.buttons & 1)) return
     const delta = e.clientX - swipeStartX.current
     // WR-04: mark as moved once past the slop threshold (either direction).
     if (Math.abs(delta) > SWIPE_SLOP) swipeMoved.current = true
@@ -122,7 +132,9 @@ export function ItemRow({
     if (delta < 0) setDx(Math.max(delta, -96))
   }, [])
 
-  const handleSwipePointerUp = useCallback(() => {
+  const handleSwipePointerUp = useCallback((e: React.PointerEvent) => {
+    isPressed.current = false
+    ;(e.currentTarget as Element).releasePointerCapture?.(e.pointerId)
     setDx((prev) => {
       if (prev <= -64) {
         setRevealed(true)
@@ -132,6 +144,22 @@ export function ItemRow({
       return 0
     })
   }, [])
+
+  // Defect A (13-05): pointercancel/pointerleave handler. Locked rule — clear the
+  // press, release capture, then: if a reveal is committed (revealed=true) leave
+  // it intact (never dismiss a user's deliberately-revealed Delete); otherwise
+  // snap a stray sub-threshold offset back to 0.
+  const handleSwipePointerCancelOrLeave = useCallback(
+    (e: React.PointerEvent) => {
+      isPressed.current = false
+      ;(e.currentTarget as Element).releasePointerCapture?.(e.pointerId)
+      if (!revealed) {
+        setDx(0)
+        setRevealed(false)
+      }
+    },
+    [revealed]
+  )
 
   // WR-03/WR-04: row-body tap handler. A tap while the Delete affordance is revealed
   // dismisses it (snap-back) instead of opening edit — never two affordances at once.
@@ -351,7 +379,7 @@ export function ItemRow({
           rendered ONLY past the swipe threshold. Distinct from DeleteConfirmation:
           no prompt, no Cancel — snap-back is the cancel. */}
       {revealed && (
-        <div className="absolute inset-y-0 right-0 flex w-24 items-stretch">
+        <div className="absolute inset-y-0 right-0 z-10 flex w-24 items-stretch">
           <Button
             variant="destructive"
             className="h-full w-full rounded-none"
@@ -373,7 +401,11 @@ export function ItemRow({
         data-swipe-row
         className={cn(
           'relative flex min-h-[48px] cursor-pointer items-center gap-3 bg-background px-3 py-2 hover:bg-secondary active:bg-secondary',
-          dx === 0 && 'transition-transform duration-150'
+          dx === 0 && 'transition-transform duration-150',
+          // Defect B (13-05): while the Delete is revealed the translated, opaque
+          // foreground must not intercept clicks aimed at the z-raised Delete. Make
+          // the foreground inert; interactive children re-enable pointer-events-auto.
+          revealed && 'pointer-events-none'
         )}
         style={{ transform: `translateX(${dx}px)` }}
         onClick={handleRowTap}
@@ -388,6 +420,8 @@ export function ItemRow({
         onPointerDown={handleSwipePointerDown}
         onPointerMove={handleSwipePointerMove}
         onPointerUp={handleSwipePointerUp}
+        onPointerCancel={handleSwipePointerCancelOrLeave}
+        onPointerLeave={handleSwipePointerCancelOrLeave}
       >
         {/* Drag handle FIRST (ITEM-02 / D-08) — handle-only useSortable listeners;
             stopPropagation so a tap never opens edit. Keyboard-focusable. */}
@@ -397,13 +431,16 @@ export function ItemRow({
           {...listeners}
           onClick={(e) => e.stopPropagation()}
           aria-label={`Reorder ${item.name}`}
-          className="flex h-11 w-11 shrink-0 cursor-grab touch-none items-center justify-center rounded-md focus-visible:ring-3 focus-visible:ring-ring/50"
+          className="pointer-events-auto flex h-11 w-11 shrink-0 cursor-grab touch-none items-center justify-center rounded-md focus-visible:ring-3 focus-visible:ring-ring/50"
         >
           <GripVertical className="size-5 text-muted-foreground" />
         </button>
 
-        {/* Checkbox — stops propagation so row-body onClick does not fire (D-01) */}
+        {/* Checkbox — stops propagation so row-body onClick does not fire (D-01).
+            pointer-events-auto (13-05) keeps it clickable while the foreground is
+            inert during a reveal. */}
         <div
+          className="pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
         >
@@ -462,7 +499,7 @@ export function ItemRow({
       {(() => {
         const qty = parseQuantity(item.quantity)
         return (
-          <div className="flex shrink-0 items-center">
+          <div className="pointer-events-auto flex shrink-0 items-center">
             <Button
               variant="ghost"
               size="icon"
