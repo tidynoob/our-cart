@@ -132,23 +132,26 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
     const trimmedName = name.trim()
     if (!trimmedName) return
 
+    // Capture submitted field values into locals BEFORE clearing, since the
+    // clears now precede the await (UAT gap 6 fix).
+    const trimmedQuantity = quantity.trim() || undefined
+    const submitCategory = category || undefined
+
     setSubmitting(true)
 
-    try {
-      await addItem(
-        listId,
-        trimmedName,
-        quantity.trim() || undefined,
-        category || undefined,
-        addedBy
-      )
+    // Clear the input SYNCHRONOUSLY before awaiting addItem so the optimistic
+    // insert never coincides with a populated `name` — otherwise dupExists is
+    // true for one frame and the role=status warning flashes (UAT gap 6,
+    // .planning/debug/additembar-dup-warning-flicker.md).
+    setName('')
+    setQuantity('')
+    setCategory('')
+    setExpanded(false)
+    setSuggestions([])
+    setFocusedIndex(-1)
 
-      setName('')
-      setQuantity('')
-      setCategory('')
-      setExpanded(false)
-      setSuggestions([])
-      setFocusedIndex(-1)
+    try {
+      await addItem(listId, trimmedName, trimmedQuantity, submitCategory, addedBy)
     } finally {
       setSubmitting(false)
     }

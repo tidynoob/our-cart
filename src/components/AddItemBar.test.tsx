@@ -360,44 +360,54 @@ describe('AddItemBar — duplicate warning (ITEM-04)', () => {
   // submit flow by making mockAddItem mutate the same `mockStoreItems` array the
   // warning reads — exactly like the production store.
   //
-  // Assertion form: ORDERING-INVARIANT (the jsdom single-frame flash is not
-  // reliably observable). The fix moves setName('') BEFORE the await, so at the
-  // moment addItem is invoked the input is ALREADY ''. We assert the input value
-  // is '' from inside the mockAddItem body. On current code the clear is
-  // post-await, so the input is still 'eggs' inside addItem → RED. After the fix
-  // it is '' → GREEN. We also assert no role=status remains after submit settles.
+  // Assertion form: OBSERVABLE FLASH via a DEFERRED addItem promise. We hold the
+  // addItem promise un-resolved after the synchronous optimistic push so React
+  // commits the intermediate render with the new `items` BEFORE the submit
+  // settles. On current (pre-fix) code, `name` is still 'eggs' at that commit AND
+  // mockStoreItems now contains an unchecked 'eggs' → dupExists true → role=status
+  // appears WHILE addItem is pending → RED. After Task 2 (clear before the await),
+  // setName('') is queued before the push, so the intermediate commit has name=''
+  // → dupExists false → no warning ever appears → GREEN. We also assert no
+  // role=status remains after the submit fully settles.
   it('adding a brand-new item does NOT flash the duplicate warning (optimistic-insert race)', async () => {
     mockStoreItems = []
     const user = userEvent.setup()
 
-    // Capture the input value observed at the instant addItem is invoked.
-    let inputValueAtAddItem: string | null = null
+    // Deferred so addItem stays pending after the synchronous optimistic push,
+    // letting React commit the intermediate render we want to inspect.
+    let resolveAddItem!: () => void
+    const addItemGate = new Promise<void>((res) => {
+      resolveAddItem = res
+    })
 
     render(<AddItemBar listId="list-1" addedBy="Test User" />)
     const input = screen.getByPlaceholderText('Add an item...') as HTMLInputElement
 
-    // Mimic the production optimistic insert: synchronously push an unchecked row
-    // carrying the submitted name (second positional arg) into the live array the
-    // warning reads, then resolve. Also record the input value at this moment.
-    mockAddItem.mockImplementation(
-      (_listId: string, submittedName: string) => {
-        inputValueAtAddItem = input.value
-        mockStoreItems.push({ name: submittedName, checked: false })
-        return Promise.resolve()
-      },
-    )
+    // Mimic the production store's optimistic insert: synchronously push an
+    // unchecked row carrying the submitted name (2nd positional arg) into the
+    // SAME live array the warning reads, then return the pending gate promise.
+    mockAddItem.mockImplementation((_listId: string, submittedName: string) => {
+      mockStoreItems.push({ name: submittedName, checked: false })
+      return addItemGate
+    })
 
     await user.type(input, 'eggs')
     // No warning while typing a brand-new name.
     expect(screen.queryByRole('status')).toBeNull()
 
+    // Submit; addItem stays pending (gate un-resolved). The optimistic 'eggs' row
+    // is now in the store. Let React flush the intermediate render.
     await user.click(screen.getByRole('button', { name: 'Add item' }))
 
-    // Ordering invariant: the input must already be cleared when addItem runs, so
-    // the synchronous optimistic insert never coincides with a populated `name`.
-    expect(inputValueAtAddItem).toBe('')
+    // THE DEFECT: pre-fix, the warning flashes here (name still populated +
+    // optimistic row present). Post-fix, name is already '' → no warning.
+    await waitFor(() => {
+      expect(mockAddItem).toHaveBeenCalled()
+    })
+    expect(screen.queryByRole('status')).toBeNull()
 
-    // And no warning flashes/remains for the just-submitted brand-new item.
+    // Settle the submit and confirm the warning never appears afterward either.
+    resolveAddItem()
     await waitFor(() => {
       expect(screen.queryByRole('status')).toBeNull()
     })
