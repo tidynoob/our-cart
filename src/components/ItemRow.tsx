@@ -107,19 +107,45 @@ export function ItemRow({
   // If it did, the trailing synthetic `click` is a swipe artifact, not a tap — we
   // suppress onTap so a snap-back swipe never accidentally opens edit mode.
   const swipeMoved = useRef(false)
+  // 13-06 FIX 1: capture-on-swipe-only. setPointerCapture must NOT run on a plain
+  // tap (the 13-05 root cause: an unconditional capture on pointerdown routed a
+  // checkbox/stepper tap's activation to the foreground → gaps 2/4). pointerCaptured
+  // tracks whether THIS gesture has taken capture, so we take it at most once and
+  // only inside pointermove once an actual left-swipe is in progress.
+  const pointerCaptured = useRef(false)
+  // 13-06 FIX 2: record whether the gesture's ORIGINATING pointerdown target was an
+  // interactive child (checkbox / stepper / drag handle). handleRowTap no-ops for
+  // such origins so a mis-routed synthetic click on the foreground cannot open edit.
+  const interactiveOrigin = useRef(false)
+  // 13-06 FIX 3: dx value at gesture start. Re-seeded each pointerdown so a swipe-back
+  // that begins while revealed computes from the committed reveal baseline (-96), not 0.
+  const dxAtStart = useRef(0)
   const [dx, setDx] = useState(0)
   const [revealed, setRevealed] = useState(false)
 
   const SWIPE_SLOP = 8
 
-  const handleSwipePointerDown = useCallback((e: React.PointerEvent) => {
-    isPressed.current = true
-    swipeStartX.current = e.clientX
-    swipeMoved.current = false
-    // Keep capture so an in-progress drag tracks off-element, but the isPressed
-    // gate (not capture) decides whether a move counts.
-    ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
-  }, [])
+  const handleSwipePointerDown = useCallback(
+    (e: React.PointerEvent) => {
+      isPressed.current = true
+      swipeStartX.current = e.clientX
+      swipeMoved.current = false
+      pointerCaptured.current = false
+      // FIX 3: snapshot the current translate so a swipe-back from a revealed row
+      // reduces |dx| from -96 (not from 0). setDx is async, so read the committed
+      // reveal directly rather than the dx state value.
+      dxAtStart.current = revealed ? -96 : 0
+      // FIX 2: e.target is where the pointerdown actually landed (NOT currentTarget,
+      // which is always the foreground). Mark interactive-child origins so handleRowTap
+      // can no-op for them.
+      interactiveOrigin.current = !!(e.target as Element).closest?.(
+        '[data-row-interactive]'
+      )
+      // FIX 1: do NOT capture here. Capture is taken in pointermove once an actual
+      // left-swipe crosses the slop, so a plain tap is never captured/diverted.
+    },
+    [revealed]
+  )
 
   const handleSwipePointerMove = useCallback((e: React.PointerEvent) => {
     // Defect A gate: ignore moves that are not part of an active press. A desktop
@@ -128,13 +154,33 @@ export function ItemRow({
     const delta = e.clientX - swipeStartX.current
     // WR-04: mark as moved once past the slop threshold (either direction).
     if (Math.abs(delta) > SWIPE_SLOP) swipeMoved.current = true
-    // Axis-lock: only track left-drag (iOS convention); clamp reveal width to -96.
-    if (delta < 0) setDx(Math.max(delta, -96))
+    // FIX 1: take capture once, only after a genuine left-swipe crosses the slop, so
+    // an in-progress drag tracks off-element. A tap (no slop-crossing left move) never
+    // captures → the checkbox/stepper get their native activation (closes gaps 2/4).
+    if (
+      !pointerCaptured.current &&
+      delta < 0 &&
+      Math.abs(delta) > SWIPE_SLOP
+    ) {
+      ;(e.currentTarget as Element).setPointerCapture?.(e.pointerId)
+      pointerCaptured.current = true
+    }
+    // FIX 3: unify both directions on the dxAtStart baseline. A left-swipe from 0
+    // still reaches -96; a right-swipe (delta>0) from a revealed row (-96) moves dx
+    // toward 0. Clamp to [-96, 0]. Clear revealed once dx crosses back above -64.
+    const next = Math.min(0, Math.max(dxAtStart.current + delta, -96))
+    setDx(next)
+    if (next > -64) setRevealed(false)
   }, [])
 
   const handleSwipePointerUp = useCallback((e: React.PointerEvent) => {
     isPressed.current = false
-    ;(e.currentTarget as Element).releasePointerCapture?.(e.pointerId)
+    if (pointerCaptured.current) {
+      ;(e.currentTarget as Element).releasePointerCapture?.(e.pointerId)
+      pointerCaptured.current = false
+    }
+    // FIX 3: generalized threshold snap — RE-HIDES after a swipe-back, not only reveals
+    // after a swipe-left. dx at or below -64 commits the reveal; above -64 snaps to 0.
     setDx((prev) => {
       if (prev <= -64) {
         setRevealed(true)
@@ -148,11 +194,16 @@ export function ItemRow({
   // Defect A (13-05): pointercancel/pointerleave handler. Locked rule — clear the
   // press, release capture, then: if a reveal is committed (revealed=true) leave
   // it intact (never dismiss a user's deliberately-revealed Delete); otherwise
-  // snap a stray sub-threshold offset back to 0.
+  // snap a stray sub-threshold offset back to 0. (An explicit rightward DRAG still
+  // un-reveals via handleSwipePointerMove's delta>0 branch — this rule is only for
+  // cancel/leave, which must NOT silently dismiss a committed reveal.)
   const handleSwipePointerCancelOrLeave = useCallback(
     (e: React.PointerEvent) => {
       isPressed.current = false
-      ;(e.currentTarget as Element).releasePointerCapture?.(e.pointerId)
+      if (pointerCaptured.current) {
+        ;(e.currentTarget as Element).releasePointerCapture?.(e.pointerId)
+        pointerCaptured.current = false
+      }
       if (!revealed) {
         setDx(0)
         setRevealed(false)
@@ -165,6 +216,13 @@ export function ItemRow({
   // dismisses it (snap-back) instead of opening edit — never two affordances at once.
   // A tap whose pointer crossed the swipe slop is a swipe artifact and is ignored.
   const handleRowTap = useCallback(() => {
+    // FIX 2: a tap whose pointerdown originated on an interactive child (checkbox /
+    // stepper / drag handle) never opens edit — belt-and-suspenders for any residual
+    // mis-routed synthetic click that reaches the foreground (closes gaps 2/4).
+    if (interactiveOrigin.current) {
+      interactiveOrigin.current = false
+      return
+    }
     if (swipeMoved.current) {
       swipeMoved.current = false
       return
@@ -394,6 +452,21 @@ export function ItemRow({
         </div>
       )}
 
+      {/* 13-06 FIX 3: tap-to-dismiss-while-revealed catcher. The foreground stays
+          pointer-events-none while revealed (Defect-B mechanism preserved — 13-05
+          Test D still asserts that class), which kills handleRowTap's revealed→snap-back
+          branch. This sibling full-bleed transparent layer is pointer-events-auto and
+          sits BELOW the z-10 Delete wrapper (so Delete still wins its right-edge strip),
+          but ABOVE the inert foreground — a tap on the rest of the row reaches
+          handleRowTap → snap-back. Rendered ONLY while revealed. */}
+      {revealed && (
+        <div
+          className="absolute inset-0 z-0 cursor-pointer"
+          onClick={handleRowTap}
+          aria-hidden="true"
+        />
+      )}
+
       {/* Foreground row — translateX driven by the swipe gesture.
           data-swipe-row + pointer handlers live HERE (same element) so the
           synthetic pointer events the Wave-0 test fires reach the handlers. */}
@@ -427,6 +500,7 @@ export function ItemRow({
             stopPropagation so a tap never opens edit. Keyboard-focusable. */}
         <button
           type="button"
+          data-row-interactive
           {...attributes}
           {...listeners}
           onClick={(e) => e.stopPropagation()}
@@ -440,6 +514,7 @@ export function ItemRow({
             pointer-events-auto (13-05) keeps it clickable while the foreground is
             inert during a reveal. */}
         <div
+          data-row-interactive
           className="pointer-events-auto"
           onClick={(e) => e.stopPropagation()}
           onKeyDown={(e) => e.stopPropagation()}
@@ -499,7 +574,10 @@ export function ItemRow({
       {(() => {
         const qty = parseQuantity(item.quantity)
         return (
-          <div className="pointer-events-auto flex shrink-0 items-center">
+          <div
+            data-row-interactive
+            className="pointer-events-auto flex shrink-0 items-center"
+          >
             <Button
               variant="ghost"
               size="icon"
