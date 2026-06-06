@@ -351,4 +351,55 @@ describe('AddItemBar — duplicate warning (ITEM-04)', () => {
 
     expect(screen.queryByRole('status')).toBeNull()
   })
+
+  // Regression for UAT gap 6: adding a brand-new (non-duplicate) item briefly
+  // flashed the amber "...is already on your list" warning before the item was
+  // added. Root cause (.planning/debug/additembar-dup-warning-flicker.md): the
+  // optimistic insert lands SYNCHRONOUSLY while `name` is still populated, and
+  // the input is cleared only AFTER `await addItem`. This test drives the REAL
+  // submit flow by making mockAddItem mutate the same `mockStoreItems` array the
+  // warning reads — exactly like the production store.
+  //
+  // Assertion form: ORDERING-INVARIANT (the jsdom single-frame flash is not
+  // reliably observable). The fix moves setName('') BEFORE the await, so at the
+  // moment addItem is invoked the input is ALREADY ''. We assert the input value
+  // is '' from inside the mockAddItem body. On current code the clear is
+  // post-await, so the input is still 'eggs' inside addItem → RED. After the fix
+  // it is '' → GREEN. We also assert no role=status remains after submit settles.
+  it('adding a brand-new item does NOT flash the duplicate warning (optimistic-insert race)', async () => {
+    mockStoreItems = []
+    const user = userEvent.setup()
+
+    // Capture the input value observed at the instant addItem is invoked.
+    let inputValueAtAddItem: string | null = null
+
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+    const input = screen.getByPlaceholderText('Add an item...') as HTMLInputElement
+
+    // Mimic the production optimistic insert: synchronously push an unchecked row
+    // carrying the submitted name (second positional arg) into the live array the
+    // warning reads, then resolve. Also record the input value at this moment.
+    mockAddItem.mockImplementation(
+      (_listId: string, submittedName: string) => {
+        inputValueAtAddItem = input.value
+        mockStoreItems.push({ name: submittedName, checked: false })
+        return Promise.resolve()
+      },
+    )
+
+    await user.type(input, 'eggs')
+    // No warning while typing a brand-new name.
+    expect(screen.queryByRole('status')).toBeNull()
+
+    await user.click(screen.getByRole('button', { name: 'Add item' }))
+
+    // Ordering invariant: the input must already be cleared when addItem runs, so
+    // the synchronous optimistic insert never coincides with a populated `name`.
+    expect(inputValueAtAddItem).toBe('')
+
+    // And no warning flashes/remains for the just-submitted brand-new item.
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).toBeNull()
+    })
+  })
 })
