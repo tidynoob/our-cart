@@ -488,3 +488,102 @@ describe('ItemRow — desktop-mouse interaction regression (UAT gaps 1+2)', () =
     expect(defaultProps.onTap).not.toHaveBeenCalled()
   })
 })
+
+// ──────────────────────────────────────────────────────────────────────────
+// Phase 13 gap-closure v2 (13-06 / ITEM-03/05): capture-on-tap + swipe-back.
+//
+// jsdom CONSTRAINT (restated from 13-06-PLAN <objective>): jsdom has NO real
+// setPointerCapture move-routing, NO paint-order hit-testing, and NO mouse
+// buttons=0 physics. 13-05's tests passed GREEN while the device stayed broken,
+// so these tests do NOT "prove" gaps 2/4/7 via replayed jsdom clicks — they
+// assert the fix MECHANISM at its call sites: (1) setPointerCapture is NOT
+// invoked on a tap-only pointer sequence, (2) handleRowTap no-ops when the
+// originating pointerdown target was an interactive child, and (3) a delta>0
+// move from a revealed state reduces |dx| and un-reveals. The on-device human
+// re-test (13-UAT.md tests 2, 4 & 7, real desktop mouse + touch) is the FINAL
+// gate for closing these three gaps.
+// ──────────────────────────────────────────────────────────────────────────
+describe('ItemRow — capture-on-tap + swipe-back regression (UAT gaps 2/4/7, v2)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useProfilesStore.setState({ profiles: {}, channel: null })
+  })
+
+  // Test 1 — a plain TAP does NOT capture the pointer (the core gap 2/4 mechanism).
+  // RED-feasibility: current handleSwipePointerDown calls setPointerCapture
+  // unconditionally (ItemRow.tsx:121), so on a tap it IS called → not.toHaveBeenCalled()
+  // FAILS (RED). After Task 2 capture moves into pointermove behind the slop+delta<0
+  // guard → a tap never reaches it → PASS (GREEN).
+  // The spy approach asserts the call-site contract (capture invoked only during an
+  // actual swipe) — the literal mechanism behind the on-device fix; jsdom Elements
+  // lack setPointerCapture unless polyfilled, so we attach a vi.fn() spy before firing.
+  it('a plain tap does NOT call setPointerCapture (capture-on-swipe-only mechanism)', () => {
+    render(<ItemRow {...defaultProps} />)
+    const row = screen.getByText('Milk').closest('[data-swipe-row]') as HTMLElement
+    expect(row).not.toBeNull()
+
+    row.setPointerCapture = vi.fn()
+    row.releasePointerCapture = vi.fn()
+
+    // Pure tap: pointerdown then pointerup at the SAME clientX, no move.
+    fireEvent.pointerDown(row, { clientX: 200, pointerId: 1, buttons: 1 })
+    fireEvent.pointerUp(row, { clientX: 200, pointerId: 1, buttons: 0 })
+
+    expect(row.setPointerCapture).not.toHaveBeenCalled()
+  })
+
+  // Test 2 — a tap whose pointerdown ORIGINATED on the checkbox does NOT open edit
+  // (interactive-child origin guard).
+  // RED-feasibility: today the only thing suppressing onTap on a checkbox tap is the
+  // wrapper's stopPropagation. The NEW contract: ItemRow records the pointerdown
+  // origin and handleRowTap no-ops for an interactive-child origin even if a click
+  // reaches the foreground. We fire pointerdown on the CHECKBOX (so the origin guard,
+  // not stopPropagation, must suppress onTap), then a click on the FOREGROUND (row)
+  // simulating the mis-routed activation. On current code the foreground's onClick=
+  // handleRowTap fires onTap (no origin guard) → FAILS (RED). After Task 2's origin
+  // ref guard → handleRowTap returns early → PASS.
+  // This proxies the on-device capture hit-steal jsdom cannot replay; the real gate
+  // is UAT test 2.
+  it('a tap originating on the checkbox does NOT open edit even if a click reaches the foreground (origin guard)', () => {
+    render(<ItemRow {...defaultProps} />)
+    const row = screen.getByText('Milk').closest('[data-swipe-row]') as HTMLElement
+    expect(row).not.toBeNull()
+
+    const checkbox = screen.getByRole('checkbox')
+    fireEvent.pointerDown(checkbox, { clientX: 200, pointerId: 1, buttons: 1 })
+    fireEvent.pointerUp(checkbox, { clientX: 200, pointerId: 1, buttons: 0 })
+    // Mis-routed activation: a click lands on the foreground (as capture would route it).
+    fireEvent.click(row)
+
+    expect(defaultProps.onTap).not.toHaveBeenCalled()
+  })
+
+  // Test 3 — a delta>0 drag from a REVEALED state reduces |dx| and un-reveals (gap 7).
+  // RED-feasibility: handleSwipePointerMove has NO delta>0 branch (ItemRow.tsx:132)
+  // → from dx=-96 a rightward drag leaves dx=-96 and revealed=true → the assertion
+  // FAILS (RED). After Task 2 adds the delta>0 reduce-and-clear branch → dx returns
+  // to 0 and Delete disappears → PASS.
+  it('a delta>0 drag from a revealed state reduces |dx| and clears the reveal (swipe-back)', () => {
+    render(<ItemRow {...defaultProps} />)
+    const row = screen.getByText('Milk').closest('[data-swipe-row]') as HTMLElement
+    expect(row).not.toBeNull()
+
+    // Phase 1 — fully reveal: -100px past the -64 threshold → dx snaps to -96, revealed.
+    fireEvent.pointerDown(row, { clientX: 200, pointerId: 1, buttons: 1 })
+    fireEvent.pointerMove(row, { clientX: 100, pointerId: 1, buttons: 1 })
+    fireEvent.pointerUp(row, { clientX: 100, pointerId: 1, buttons: 0 })
+    expect(screen.getByText('Delete')).toBeTruthy()
+
+    // Phase 2 — swipe back: a new gesture starting at the revealed position, dragged
+    // rightward by +120 (start 100 → 220). From the revealed baseline (-96) this moves
+    // dx past -64 toward 0 → reveal cleared, dx snaps to 0.
+    fireEvent.pointerDown(row, { clientX: 100, pointerId: 1, buttons: 1 })
+    fireEvent.pointerMove(row, { clientX: 220, pointerId: 1, buttons: 1 })
+    fireEvent.pointerUp(row, { clientX: 220, pointerId: 1, buttons: 0 })
+
+    // Delete is gone AND the foreground is no longer translated.
+    expect(screen.queryByText('Delete')).toBeNull()
+    const transform = (row as HTMLElement).style.transform
+    expect(transform === '' || transform === 'translateX(0px)').toBe(true)
+  })
+})
