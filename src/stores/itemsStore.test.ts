@@ -54,7 +54,18 @@ function createMockFrom() {
       return {
         eq: (col: string, val: unknown) => {
           mockEqFn(col, val)
-          return mockUpdateFn._resolvePromise ?? Promise.resolve({ data: null, error: null })
+          // Return an object that is both thenable (single-eq chains: toggleChecked,
+          // updateItem, reorderItem) AND has .eq() for double-eq chains (uncheckAll's
+          // .update({checked:false}).eq('list_id').eq('checked',true)) — mirrors delete().
+          const resolvedPromise = mockUpdateFn._resolvePromise ?? Promise.resolve({ data: null, error: null })
+          return {
+            eq: (col2: string, val2: unknown) => {
+              mockEqFn(col2, val2)
+              return resolvedPromise
+            },
+            then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+              resolvedPromise.then(resolve, reject),
+          }
         },
       }
     },
