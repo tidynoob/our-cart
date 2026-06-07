@@ -111,6 +111,13 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
       if (match?.category) {
         setCategory(match.category)
         setExpanded(true)
+      } else {
+        // WR-01: drop a previously auto-prefilled category when the name no longer matches
+        // any history entry (e.g. typed "Milk" → prefilled Dairy, then edited to "Eggs").
+        // Otherwise the stale Dairy would silently file Eggs under Dairy on submit. This is
+        // gated by !categoryTouched, so a category the user MANUALLY picked is never
+        // clobbered (the frozen 14-01 no-clobber contract is preserved).
+        setCategory('')
       }
     }
   }
