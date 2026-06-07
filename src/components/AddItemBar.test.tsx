@@ -6,6 +6,9 @@ import { AddItemBar } from './AddItemBar'
 // Module-level mock data and mock functions
 let mockSuggestionData: Array<{ name: string; category: string | null; quantity: string | null }> = []
 const mockAddItem = vi.fn()
+// Live store items the AddItemBar reads via useItemsStore(s => s.items) for the
+// ITEM-04 duplicate warning. Per-test controllable (name + checked flag).
+let mockStoreItems: Array<{ name: string; checked: boolean }> = []
 
 // Mock Supabase with 4-level chain: from -> select -> eq -> order
 vi.mock('@/lib/supabase', () => ({
@@ -21,10 +24,13 @@ vi.mock('@/lib/supabase', () => ({
   },
 }))
 
-// Mock itemsStore — useItemsStore selector pattern
+// Mock itemsStore — useItemsStore selector pattern.
+// Widened to also expose `items` so Plan 04's `useItemsStore(s => s.items)`
+// resolves (without this, `items.some(...)` throws TypeError instead of clean RED).
 vi.mock('@/stores/itemsStore', () => ({
-  useItemsStore: (selector: (state: { addItem: typeof mockAddItem }) => unknown) =>
-    selector({ addItem: mockAddItem }),
+  useItemsStore: (
+    selector: (state: { addItem: typeof mockAddItem; items: typeof mockStoreItems }) => unknown,
+  ) => selector({ addItem: mockAddItem, items: mockStoreItems }),
 }))
 
 // Mock @base-ui/react/checkbox (same as ItemRow.test.tsx)
@@ -293,5 +299,117 @@ describe('AddItemBar tap targets', () => {
     expect(moreBtn.className).toContain('min-h-[44px]')
     expect(moreBtn.className).toContain('flex')
     expect(moreBtn.className).toContain('items-center')
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// RED (Wave 0, ITEM-04): live duplicate warning. The warning UI does not exist
+// on AddItemBar yet — these queries fail until it lands (Plan 04). The contract:
+// case-insensitive match against UNCHECKED store items, role="status", and the
+// Add submit button stays ENABLED (non-blocking, D-15).
+// ──────────────────────────────────────────────────────────────────────────
+describe('AddItemBar — duplicate warning (ITEM-04)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockSuggestionData = []
+    mockStoreItems = []
+  })
+
+  it('shows a role="status" warning for a case-insensitive unchecked match AND keeps Add enabled', async () => {
+    mockStoreItems = [{ name: 'Milk', checked: false }]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    const input = screen.getByPlaceholderText('Add an item...')
+    await user.type(input, 'milk') // different case than the stored 'Milk'
+
+    const warning = await screen.findByRole('status')
+    expect(warning.textContent).toContain('already on your list')
+    expect(warning.textContent).toContain('milk')
+
+    // Non-blocking: the Add submit button stays enabled.
+    const submitButton = screen.getByRole('button', { name: 'Add item' }) as HTMLButtonElement
+    expect(submitButton.disabled).toBe(false)
+  })
+
+  it('shows NO warning when the only match is CHECKED (unchecked-only)', async () => {
+    mockStoreItems = [{ name: 'Milk', checked: true }]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    await user.type(screen.getByPlaceholderText('Add an item...'), 'milk')
+
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  it('shows NO warning when the typed name does not match any item', async () => {
+    mockStoreItems = [{ name: 'Milk', checked: false }]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    await user.type(screen.getByPlaceholderText('Add an item...'), 'eggs')
+
+    expect(screen.queryByRole('status')).toBeNull()
+  })
+
+  // Regression for UAT gap 6: adding a brand-new (non-duplicate) item briefly
+  // flashed the amber "...is already on your list" warning before the item was
+  // added. Root cause (.planning/debug/additembar-dup-warning-flicker.md): the
+  // optimistic insert lands SYNCHRONOUSLY while `name` is still populated, and
+  // the input is cleared only AFTER `await addItem`. This test drives the REAL
+  // submit flow by making mockAddItem mutate the same `mockStoreItems` array the
+  // warning reads — exactly like the production store.
+  //
+  // Assertion form: OBSERVABLE FLASH via a DEFERRED addItem promise. We hold the
+  // addItem promise un-resolved after the synchronous optimistic push so React
+  // commits the intermediate render with the new `items` BEFORE the submit
+  // settles. On current (pre-fix) code, `name` is still 'eggs' at that commit AND
+  // mockStoreItems now contains an unchecked 'eggs' → dupExists true → role=status
+  // appears WHILE addItem is pending → RED. After Task 2 (clear before the await),
+  // setName('') is queued before the push, so the intermediate commit has name=''
+  // → dupExists false → no warning ever appears → GREEN. We also assert no
+  // role=status remains after the submit fully settles.
+  it('adding a brand-new item does NOT flash the duplicate warning (optimistic-insert race)', async () => {
+    mockStoreItems = []
+    const user = userEvent.setup()
+
+    // Deferred so addItem stays pending after the synchronous optimistic push,
+    // letting React commit the intermediate render we want to inspect.
+    let resolveAddItem!: () => void
+    const addItemGate = new Promise<void>((res) => {
+      resolveAddItem = res
+    })
+
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+    const input = screen.getByPlaceholderText('Add an item...') as HTMLInputElement
+
+    // Mimic the production store's optimistic insert: synchronously push an
+    // unchecked row carrying the submitted name (2nd positional arg) into the
+    // SAME live array the warning reads, then return the pending gate promise.
+    mockAddItem.mockImplementation((_listId: string, submittedName: string) => {
+      mockStoreItems.push({ name: submittedName, checked: false })
+      return addItemGate
+    })
+
+    await user.type(input, 'eggs')
+    // No warning while typing a brand-new name.
+    expect(screen.queryByRole('status')).toBeNull()
+
+    // Submit; addItem stays pending (gate un-resolved). The optimistic 'eggs' row
+    // is now in the store. Let React flush the intermediate render.
+    await user.click(screen.getByRole('button', { name: 'Add item' }))
+
+    // THE DEFECT: pre-fix, the warning flashes here (name still populated +
+    // optimistic row present). Post-fix, name is already '' → no warning.
+    await waitFor(() => {
+      expect(mockAddItem).toHaveBeenCalled()
+    })
+    expect(screen.queryByRole('status')).toBeNull()
+
+    // Settle the submit and confirm the warning never appears afterward either.
+    resolveAddItem()
+    await waitFor(() => {
+      expect(screen.queryByRole('status')).toBeNull()
+    })
   })
 })

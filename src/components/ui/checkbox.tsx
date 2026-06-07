@@ -13,13 +13,12 @@ function Checkbox({
       <CheckboxPrimitive.Root
         checked={checked}
         onCheckedChange={onCheckedChange}
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-input bg-background data-[checked]:bg-primary data-[checked]:border-primary"
         {...props}
       >
-        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded border border-input bg-background data-[checked]:bg-primary data-[checked]:border-primary">
-          <CheckboxPrimitive.Indicator>
-            <Check className="h-3.5 w-3.5 text-primary-foreground" />
-          </CheckboxPrimitive.Indicator>
-        </span>
+        <CheckboxPrimitive.Indicator>
+          <Check className="h-3.5 w-3.5 text-primary-foreground" />
+        </CheckboxPrimitive.Indicator>
       </CheckboxPrimitive.Root>
     </div>
   )

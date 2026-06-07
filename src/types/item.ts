@@ -12,4 +12,6 @@ export interface Item {
   added_by: string | null
   user_id: string | null
   created_at: string
+  note: string | null // NEW (ITEM-01)
+  position: string | null // NEW (ITEM-02)
 }

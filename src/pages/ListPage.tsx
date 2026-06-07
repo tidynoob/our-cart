@@ -1,18 +1,37 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Menu, Pencil, Share2, Trash2 } from 'lucide-react'
+import { Menu, Pencil, Share2, Trash2, Users } from 'lucide-react'
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
 import { supabase } from '@/lib/supabase'
 import { useUIStore } from '@/stores/uiStore'
 import { useItemsStore } from '@/stores/itemsStore'
+import { useProfilesStore } from '@/stores/profilesStore'
+import { usePresenceStore } from '@/stores/presenceStore'
 import { useListsStore } from '@/stores/listsStore'
 import { useAuthStore } from '@/stores/authStore'
 import { groupItemsByCategory } from '@/lib/categories'
 import type { Item } from '@/types/item'
-import type { User } from '@supabase/supabase-js'
+import { resolveDisplayName } from '@/lib/displayName'
 import { ShareBanner } from '@/components/ShareBanner'
 import { AddItemBar } from '@/components/AddItemBar'
 import { CategorySection } from '@/components/CategorySection'
 import { SyncStatus } from '@/components/SyncStatus'
+import { PresenceIndicator } from '@/components/PresenceIndicator'
+import { Spinner } from '@/components/Spinner'
+import MembersDialog from '@/components/MembersDialog'
 import { useSidebarContext } from '@/contexts/SidebarContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -60,6 +79,17 @@ export default function ListPage() {
   const [deleteListDialogOpen, setDeleteListDialogOpen] = useState(false)
   const [deleteListLoading, setDeleteListLoading] = useState(false)
 
+  // Members dialog state — ephemeral UI, not Zustand
+  const [membersDialogOpen, setMembersDialogOpen] = useState(false)
+
+  // List members state — fetched after list loads; undefined = loading spinner in dialog
+  const [listMembers, setListMembers] = useState<
+    { user_id: string; created_at: string }[] | undefined
+  >(undefined)
+
+  // Member removal eject state — set true when current user is removed from list
+  const [removedFromList, setRemovedFromList] = useState(false)
+
   // Auth state — for owner guard (user.id === list.owner_id)
   const user = useAuthStore((state) => state.user)
 
@@ -76,6 +106,15 @@ export default function ListPage() {
   const deleteItem = useItemsStore((state) => state.deleteItem)
   const toggleChecked = useItemsStore((state) => state.toggleChecked)
   const clearChecked = useItemsStore((state) => state.clearChecked)
+  const reorderItem = useItemsStore((state) => state.reorderItem)
+
+  // dnd-kit sensors (ITEM-02 / RESEARCH Pattern 1): PointerSensor with an 8px
+  // activation distance so tap/scroll/swipe don't start a drag (Pitfall 4), plus
+  // a KeyboardSensor for accessible pickup/move.
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  )
 
   // Derived from store — no new state field (per research: items.filter(i => i.checked).length)
   const checkedCount = items.filter((i) => i.checked).length
@@ -125,6 +164,34 @@ export default function ListPage() {
     const { subscribeToList: subscribe } = useItemsStore.getState()
     subscribe(list.id)
 
+    // Load cross-user profiles for attribution (PROF-04) and subscribe to live updates (PROF-05)
+    useProfilesStore.getState().loadForList(list.id)
+
+    // Open the presence channel (OPS-02). Dedicated topic presence-${id}; key=user.id.
+    // Identity is a presentational fallback only — PresenceIndicator renders from
+    // the server-sourced profilesStore. track() fires on SUBSCRIBED inside the store.
+    usePresenceStore.getState().subscribe(list.id, user!.id, {
+      display_name: resolveDisplayName(user!),
+      avatar_url:
+        user!.user_metadata?.avatar_url ?? user!.user_metadata?.picture ?? null,
+    })
+
+    // Fetch list members so MembersDialog shows member rows (not spinner) (T3/T4 fix)
+    fetchListMembers(list.id)
+
+    // Open list-level Broadcast channel for member_removed eject (MEMBER-01 / D-09)
+    // Topic 'list-{listId}' is distinct from 'items-{listId}' (RESEARCH Pattern 6)
+    const listChannel = supabase
+      .channel(`list-${list.id}`)
+      .on('broadcast', { event: 'member_removed' }, (payload) => {
+        // Only eject if the removed user_id matches the current user (T-11-06-01 spoofing guard)
+        if (payload.payload?.user_id === user?.id) {
+          setRemovedFromList(true)
+          setTimeout(() => navigate('/'), 1500)
+        }
+      })
+      .subscribe()
+
     // D-07: belt-and-suspenders for mobile Safari screen-lock reconnect.
     // WR-02 fix: Route through subscribeToList (the full recovery path) instead of
     // calling fetchItems directly. This consolidates recovery into a single path and
@@ -154,11 +221,27 @@ export default function ListPage() {
 
     return () => {
       useItemsStore.getState().unsubscribe()
+      useProfilesStore.getState().unsubscribe()  // clean up profiles channel (Pitfall 4)
+      usePresenceStore.getState().unsubscribe()  // untrack + removeChannel presence (crit 2)
+      supabase.removeChannel(listChannel)          // clean up list Broadcast channel (T-11-06-02)
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('offline', handleOffline)
       window.removeEventListener('online', handleOnline)
+      setListMembers(undefined)  // reset so dialog shows spinner on next list load
     }
-  }, [list]) // Only re-run when the list identity changes
+  }, [list, user?.id, navigate]) // user?.id (not user) — token refresh mints a new user object with the same id; depending on the object tore down + rebuilt every channel hourly
+
+  // --- Members Fetch ---
+
+  /** Fetch list_members for the current list and populate listMembers state. */
+  async function fetchListMembers(listId: string) {
+    const { data } = await supabase
+      .from('list_members')
+      .select('user_id, created_at')
+      .eq('list_id', listId)
+      .order('created_at', { ascending: true })
+    setListMembers(data ?? [])
+  }
 
   // --- Edit/Delete Handlers ---
 
@@ -176,7 +259,10 @@ export default function ListPage() {
   }
 
   /** Save edited item changes via store action, then exit edit mode. */
-  function handleSave(id: string, changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>) {
+  function handleSave(
+    id: string,
+    changes: Partial<Pick<Item, 'name' | 'quantity' | 'category' | 'note' | 'position'>>
+  ) {
     // Store handles rollback + error state internally; .catch() guards
     // against unhandled rejections from network-level throws (WR-03).
     updateItem(id, changes).catch(() => {})
@@ -210,6 +296,23 @@ export default function ListPage() {
     // Store handles rollback + error state internally; .catch() guards
     // against unhandled rejections from network-level throws (WR-03).
     toggleChecked(id).catch(() => {})
+  }
+
+  // --- Drag-reorder Handler (ITEM-02 / RESEARCH Pattern 1) ---
+
+  /** Drop end → reorder via store. Guards no-op drops; store owns the single
+   *  {category, position} write + rollback. .catch() guards unhandled rejection. */
+  function handleDragEnd(e: DragEndEvent) {
+    const { active, over } = e
+    if (!over || active.id === over.id) return
+    reorderItem(String(active.id), String(over.id)).catch(() => {})
+  }
+
+  // --- Quantity Stepper Handler (ITEM-03) ---
+
+  /** Stepper tap → quantity-only optimistic update via store. */
+  function handleStep(id: string, quantity: string) {
+    updateItem(id, { quantity }).catch(() => {})
   }
 
   // --- Clear Checked Handler (Phase 3 — SHOP-03/04) ---
@@ -252,21 +355,10 @@ export default function ListPage() {
     navigate('/')
   }
 
-  /** Resolve a display name from auth user metadata — D-10 / Pitfall 4 / Pitfall 8. */
-  function resolveDisplayName(u: User): string {
-    return (
-      u.user_metadata?.display_name ??
-      u.user_metadata?.full_name ??
-      u.user_metadata?.name ??
-      u.email?.split('@')[0] ??
-      'Unknown'
-    )
-  }
-
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
-        <p>Loading...</p>
+        <Spinner />
       </div>
     )
   }
@@ -283,12 +375,8 @@ export default function ListPage() {
   }
 
   const grouped = groupItemsByCategory(items)
-
-  // Current-user attribution values for CategorySection → ItemRow live attribution (D-04/D-06)
-  const currentUserDisplayName = user ? resolveDisplayName(user) : undefined
-  const currentUserAvatarUrl = user
-    ? (user.user_metadata?.avatar_url ?? user.user_metadata?.picture ?? null)
-    : null
+  // Flat id list (grouped/sorted order) for the single list-wide SortableContext.
+  const flatItemIds = grouped.flatMap((g) => g.items.map((i) => i.id))
 
   return (
     <div className="min-h-screen flex flex-col items-center">
@@ -299,6 +387,17 @@ export default function ListPage() {
           listName={displayName ?? list.name}
           onDismiss={() => dismissBanner(list.share_code)}
         />
+      )}
+
+      {/* Member removal eject message (MEMBER-01 / D-09) — shown before redirect to '/' */}
+      {removedFromList && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="text-sm text-muted-foreground text-center py-2"
+        >
+          You were removed from this list
+        </div>
       )}
 
       <div className="w-full max-w-md p-4">
@@ -361,6 +460,8 @@ export default function ListPage() {
               )}
             </div>
           )}
+          {/* Presence (OPS-02) — between the name block and SyncStatus; self never shown */}
+          <PresenceIndicator />
           <SyncStatus />
           {dismissedBanners.has(list.share_code) && (
             <Button
@@ -373,6 +474,16 @@ export default function ListPage() {
               <Share2 className="h-4 w-4" />
             </Button>
           )}
+          {/* Members management button (D-07) — visible to all authenticated list members */}
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-label="Manage members"
+            onClick={() => setMembersDialogOpen(true)}
+            className="h-8 w-8 shrink-0"
+          >
+            <Users className="h-4 w-4" />
+          </Button>
         </div>
 
         <div className="mt-4 flex flex-col gap-6">
@@ -385,7 +496,7 @@ export default function ListPage() {
 
           {/* Items loading state */}
           {itemsLoading && (
-            <p className="text-sm text-muted-foreground">Loading items...</p>
+            <Spinner label="Loading items" size="sm" />
           )}
 
           {/* Items error state — covers both load failures and failed
@@ -413,26 +524,39 @@ export default function ListPage() {
             </div>
           )}
 
-          {/* Category sections */}
-          {!itemsLoading && grouped.map((group) => (
-            <CategorySection
-              key={group.category}
-              category={group.category}
-              items={group.items}
-              editingItemId={editingItemId}
-              deletingItemId={deletingItemId}
-              onItemTap={handleItemTap}
-              onCancelEdit={handleCancelEdit}
-              onSave={handleSave}
-              onDelete={handleDelete}
-              onConfirmDelete={handleConfirmDelete}
-              onCancelDelete={handleCancelDelete}
-              onToggle={handleToggle}
-              currentUserId={user?.id ?? null}
-              currentUserDisplayName={currentUserDisplayName}
-              currentUserAvatarUrl={currentUserAvatarUrl}
-            />
-          ))}
+          {/* Category sections — single list-wide DndContext + SortableContext
+              (ITEM-02 / RESEARCH Pattern 1). Cross-category MOVE is computed in
+              handleDragEnd → reorderItem (one {category, position} write). */}
+          {!itemsLoading && (
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragEnd={handleDragEnd}
+            >
+              <SortableContext
+                items={flatItemIds}
+                strategy={verticalListSortingStrategy}
+              >
+                {grouped.map((group) => (
+                  <CategorySection
+                    key={group.category}
+                    category={group.category}
+                    items={group.items}
+                    editingItemId={editingItemId}
+                    deletingItemId={deletingItemId}
+                    onItemTap={handleItemTap}
+                    onCancelEdit={handleCancelEdit}
+                    onSave={handleSave}
+                    onStep={handleStep}
+                    onDelete={handleDelete}
+                    onConfirmDelete={handleConfirmDelete}
+                    onCancelDelete={handleCancelDelete}
+                    onToggle={handleToggle}
+                  />
+                ))}
+              </SortableContext>
+            </DndContext>
+          )}
 
           {/* Clear completed button — only rendered when checked items exist (D-06) */}
           {!itemsLoading && checkedCount > 0 && (
@@ -508,6 +632,17 @@ export default function ListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Members management dialog (D-07 / MEMBER-01/02) */}
+      <MembersDialog
+        listId={list.id}
+        listName={displayName ?? list.name}
+        ownerId={list.owner_id ?? ''}
+        members={listMembers?.map(m => ({ user_id: m.user_id, joined_at: m.created_at }))}
+        open={membersDialogOpen}
+        onOpenChange={setMembersDialogOpen}
+        onMembersChanged={() => fetchListMembers(list.id)}
+      />
     </div>
   )
 }

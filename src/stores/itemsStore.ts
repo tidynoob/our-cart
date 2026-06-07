@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { nanoid } from 'nanoid'
 import { supabase } from '@/lib/supabase'
+import { computeReorderKey, safeReorderKey, byPosition } from '@/lib/ordering'
 import type { Item } from '@/types/item'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -14,6 +15,12 @@ let inFlightListId: string | null = null
 // server rows that match a pending optimistic item (by name) — prevents the race where
 // the Realtime INSERT event arrives before the HTTP response replaces the temp ID (CR-01).
 const pendingTempIds = new Set<string>()
+
+// One-shot echo-guard for reorder/move writes (D-10). Mirrors pendingTempIds exactly:
+// reorderItem adds the activeId before its optimistic set, and the Realtime UPDATE
+// branch consumes-and-skips the matching own-write echo so the row does not flicker
+// back to a stale {category, position} before the optimistic value is confirmed.
+const pendingReorders = new Set<string>()
 
 interface ItemsState {
   items: Item[]
@@ -33,9 +40,10 @@ interface ItemsState {
   ) => Promise<void>
   updateItem: (
     id: string,
-    changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>
+    changes: Partial<Pick<Item, 'name' | 'quantity' | 'category' | 'note' | 'position'>>
   ) => Promise<void>
   deleteItem: (id: string) => Promise<void>
+  reorderItem: (activeId: string, overId: string) => Promise<void>
   toggleChecked: (id: string) => Promise<void>
   clearChecked: (listId: string) => Promise<void>
   subscribeToList: (listId: string) => void
@@ -73,6 +81,27 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
 
   addItem: async (listId, name, quantity, category, addedBy, userId) => {
     const tempId = nanoid()
+    // Pitfall 3 / D-11: new rows get a position key appended AFTER the current max
+    // so they sort to the end and are never null-position. computeReorderKey(max, null)
+    // wraps generateKeyBetween; null currentMax yields the first key for an empty list.
+    //
+    // WR-01: two near-simultaneous adds (both users at once — the core 2-user case — or
+    // a rapid double-tap permitted by the non-blocking duplicate warning) both read the
+    // same synchronous snapshot and mint the IDENTICAL key, which later bricks reordering
+    // (CR-02). Guard against it: collect every existing position, append past the current
+    // max, and if the freshly-minted key collides with one already present, keep appending
+    // past it until unique. Bounded loop — terminates as soon as no collision remains.
+    const positions = [...get().items]
+      .filter((i) => i.position != null)
+      .map((i) => i.position as string)
+      .sort()
+    const existing = new Set(positions)
+    let currentMax: string | null = positions.at(-1) ?? null
+    let position = computeReorderKey(currentMax, null)
+    while (existing.has(position)) {
+      currentMax = position
+      position = computeReorderKey(currentMax, null)
+    }
     const optimisticItem: Item = {
       id: tempId,
       list_id: listId,
@@ -83,6 +112,8 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       added_by: addedBy || null,
       user_id: userId ?? null,
       created_at: new Date().toISOString(),
+      note: null,
+      position,
     }
 
     // Optimistic add — append to items array and track temp ID for dedup (CR-01)
@@ -97,6 +128,7 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
         quantity: quantity || null,
         category: category || null,
         added_by: addedBy || null,
+        position,
       })
       .select()
       .single()
@@ -170,6 +202,77 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
         syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
       }))
     }
+  },
+
+  reorderItem: async (activeId, overId) => {
+    // D-09 cross-category move: dropping onto an item in another section adopts that
+    // section's category in a SINGLE combined {category, position} write. Mirrors the
+    // updateItem optimistic + per-item rollback template with the pendingReorders
+    // echo guard (D-10).
+    const prev = get().items.find((i) => i.id === activeId)
+    const target = get().items.find((i) => i.id === overId)
+    if (!prev || !target) return
+
+    const newCategory = target.category
+
+    // Full sorted list of the TARGET category (including the dragged item) so we can
+    // derive DRAG DIRECTION (CR-01). dnd-kit's over.id carries no direction, so we
+    // compare the dragged item's current index against the drop-target index:
+    // dragging DOWN (active before over) inserts BELOW overId; dragging UP inserts ABOVE.
+    // WR-05: only consider rows with non-null positions when deriving neighbor keys, so
+    // legacy/null-position rows never feed a null/invalid neighbor into key computation.
+    const sorted = get()
+      .items.filter((i) => i.category === newCategory && i.position != null)
+      .sort(byPosition)
+    const activeIdx = sorted.findIndex((i) => i.id === activeId)
+    const overIdxFull = sorted.findIndex((i) => i.id === overId)
+    // Default to inserting below when the active item is not in this category yet
+    // (cross-category drop): it has no current index here, so treat as "dropping onto".
+    const insertingBelow = activeIdx === -1 ? true : activeIdx < overIdxFull
+
+    const inCat = sorted.filter((i) => i.id !== activeId)
+    const overPos = inCat.findIndex((i) => i.id === overId)
+    const before = insertingBelow
+      ? inCat[overPos]?.position ?? null
+      : inCat[overPos - 1]?.position ?? null
+    const after = insertingBelow
+      ? inCat[overPos + 1]?.position ?? null
+      : inCat[overPos]?.position ?? null
+
+    // CR-02 / WR-06: tolerate degenerate (duplicate/unsorted/legacy) neighbor pairs.
+    // safeReorderKey never throws; it falls back to append, or returns null if no key
+    // can be computed — in which case surface the error rather than silently no-op.
+    const newPosition = safeReorderKey(before, after)
+    if (newPosition === null) {
+      set({ error: 'Failed to reorder item' })
+      return
+    }
+
+    // Echo guard BEFORE the optimistic set so our own UPDATE echo is consumed (no flicker).
+    pendingReorders.add(activeId)
+    set((state) => ({
+      items: state.items.map((i) =>
+        i.id === activeId ? { ...i, category: newCategory, position: newPosition } : i
+      ),
+    }))
+
+    // ONE combined write carrying BOTH category and position (D-09).
+    const { error } = await supabase
+      .from('items')
+      .update({ category: newCategory, position: newPosition })
+      .eq('id', activeId)
+
+    if (error) {
+      // Per-item rollback to prev; drop the echo guard since no echo will arrive.
+      // SYNC-03: If offline, also set syncStatus to 'reconnecting' (belt-and-suspenders).
+      pendingReorders.delete(activeId)
+      set((state) => ({
+        items: state.items.map((i) => (i.id === activeId ? prev : i)),
+        error: 'Failed to reorder item',
+        syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
+      }))
+    }
+    // On success: leave activeId in pendingReorders — the UPDATE branch consumes it.
   },
 
   toggleChecked: async (id) => {
@@ -278,6 +381,14 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
               // WR-03 fix: Early return same reference when no item matches, avoiding
               // unnecessary re-renders. Mirrors the DELETE branch's defensive pattern.
               const updatedId = (newRow as Item).id
+              // D-10 one-shot echo-skip: consume our own reorder UPDATE echo so the row
+              // keeps its optimistic {category, position} (no flicker). Mirrors the
+              // pendingTempIds consume-and-skip in the INSERT branch. A subsequent
+              // partner UPDATE for the same id is not pending and merges normally below.
+              if (pendingReorders.has(updatedId)) {
+                pendingReorders.delete(updatedId)
+                return state
+              }
               if (!state.items.some((i) => i.id === updatedId)) return state
               return {
                 items: state.items.map((i) =>

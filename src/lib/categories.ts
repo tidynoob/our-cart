@@ -8,6 +8,7 @@
  * Per D-04, D-05, D-06: Uncategorized is a grouping-only label, not selectable.
  */
 import type { Item } from '@/types/item'
+import { byPosition } from '@/lib/ordering'
 
 /** Categories available for selection in add/edit dropdowns. */
 export const SELECTABLE_CATEGORIES = [
@@ -44,7 +45,9 @@ export type CategoryGroup = (typeof CATEGORY_ORDER)[number]
  * Groups items by category in CATEGORY_ORDER.
  * - Items with null, undefined, or unrecognized category go to Uncategorized.
  * - Empty categories are omitted from the result.
- * - Items within a category maintain their insertion order.
+ * - Items within a category are sorted by `position` (lexicographic), with a
+ *   `created_at` fallback for null positions (legacy rows) — the single ordering
+ *   chokepoint, so CategorySection/ListPage need no sort logic (D-09).
  */
 export function groupItemsByCategory(
   items: Item[]
@@ -69,9 +72,10 @@ export function groupItemsByCategory(
     }
   }
 
-  // Return in predefined order, omitting empty categories
+  // Return in predefined order, omitting empty categories.
+  // Sort each group by position (lexicographic) with created_at fallback (D-09).
   return CATEGORY_ORDER.filter((cat) => groups.has(cat)).map((cat) => ({
     category: cat,
-    items: groups.get(cat)!,
+    items: groups.get(cat)!.sort(byPosition),
   }))
 }

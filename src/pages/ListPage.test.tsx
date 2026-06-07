@@ -82,11 +82,18 @@ vi.mock('@/lib/supabase', () => ({
     },
     channel: vi.fn().mockReturnValue({
       on: vi.fn().mockReturnThis(),
-      subscribe: vi.fn().mockImplementation((cb: (status: string) => void) => {
-        // Trigger SUBSCRIBED immediately so tests don't hang waiting for it
-        setTimeout(() => cb('SUBSCRIBED'), 0)
+      subscribe: vi.fn().mockImplementation((cb?: (status: string) => void) => {
+        // Trigger SUBSCRIBED immediately so tests don't hang waiting for it.
+        // Guard: cb may be undefined when subscribe() is called without args (e.g. listChannel).
+        if (cb) setTimeout(() => cb('SUBSCRIBED'), 0)
         return {}
       }),
+      // Presence channel methods (OPS-02): presenceStore calls track() on SUBSCRIBED
+      // and untrack()/presenceState() on cleanup/sync. Stub them so this shared channel
+      // mock also satisfies the presence-${id} channel.
+      track: vi.fn().mockResolvedValue('ok'),
+      untrack: vi.fn().mockResolvedValue('ok'),
+      presenceState: vi.fn().mockReturnValue({}),
     }),
     removeChannel: vi.fn(),
   },

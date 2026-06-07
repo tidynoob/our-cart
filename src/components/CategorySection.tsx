@@ -8,14 +8,15 @@ interface CategorySectionProps {
   deletingItemId: string | null
   onItemTap: (id: string) => void
   onCancelEdit: () => void
-  onSave: (id: string, changes: Partial<Pick<Item, 'name' | 'quantity' | 'category'>>) => void
+  onSave: (
+    id: string,
+    changes: Partial<Pick<Item, 'name' | 'quantity' | 'category' | 'note' | 'position'>>
+  ) => void
+  onStep?: (id: string, quantity: string) => void
   onDelete: (id: string) => void
   onConfirmDelete: (id: string) => void
   onCancelDelete: () => void
   onToggle: (id: string) => void
-  currentUserId?: string | null
-  currentUserDisplayName?: string
-  currentUserAvatarUrl?: string | null
 }
 
 /**
@@ -34,13 +35,11 @@ export function CategorySection({
   onItemTap,
   onCancelEdit,
   onSave,
+  onStep,
   onDelete,
   onConfirmDelete,
   onCancelDelete,
   onToggle,
-  currentUserId,
-  currentUserDisplayName,
-  currentUserAvatarUrl,
 }: CategorySectionProps) {
   return (
     <div>
@@ -61,13 +60,11 @@ export function CategorySection({
             onTap={() => onItemTap(item.id)}
             onCancelEdit={onCancelEdit}
             onSave={onSave}
+            onStep={onStep}
             onDelete={() => onDelete(item.id)}
             onCancelDelete={onCancelDelete}
             onConfirmDelete={() => onConfirmDelete(item.id)}
             onToggle={() => onToggle(item.id)}
-            currentUserId={currentUserId}
-            currentUserDisplayName={currentUserDisplayName}
-            currentUserAvatarUrl={currentUserAvatarUrl}
           />
         ))}
       </div>
