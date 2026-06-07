@@ -27,6 +27,8 @@ import { groupItemsByCategory } from '@/lib/categories'
 import type { Item } from '@/types/item'
 import { resolveDisplayName } from '@/lib/displayName'
 import { ShareBanner } from '@/components/ShareBanner'
+import { IosInstallBanner } from '@/components/IosInstallBanner'
+import { InstallPrompt } from '@/components/InstallPrompt'
 import { AddItemBar } from '@/components/AddItemBar'
 import { UndoSnackbar } from '@/components/UndoSnackbar'
 import { CategorySection } from '@/components/CategorySection'
@@ -421,6 +423,11 @@ export default function ListPage() {
 
   return (
     <div className="min-h-screen flex flex-col items-center">
+      {/* iOS A2HS instruction banner (PWA-01 / D-11) — top banner position like
+          ShareBanner. Self-gates (isIosSafari && !standalone && !dismissed), so
+          no dismissedBanners wrapper; its own predicate owns visibility. */}
+      <IosInstallBanner />
+
       {/* ShareBanner shown until dismissed (D-04) */}
       {!dismissedBanners.has(list.share_code) && (
         <ShareBanner
@@ -650,6 +657,11 @@ export default function ListPage() {
           {/* Undo-clear snackbar (SHOP-05) — bottom of list content, inline (UI-SPEC §1).
               Self-gates on lastCleared (renders null when empty). */}
           <UndoSnackbar />
+
+          {/* Android install affordance (PWA-01 / D-10) — inline at list bottom,
+              mirroring UndoSnackbar. Self-gates (canInstall && !standalone &&
+              !sessionDismissed); no dismissedBanners wrapper. */}
+          <InstallPrompt />
         </div>
       </div>
 
