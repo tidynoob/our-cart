@@ -17,10 +17,20 @@ function createMockFrom() {
   return {
     insert: (data: unknown) => {
       mockInsertFn(data)
+      // Single resolved promise shared by BOTH the .select().single() chain (addItem)
+      // and the direct-thenable array-insert path (undoClear's `.from('items').insert(buffered)`
+      // with no .select()). The _resolvePromise override hook lets error-path tests force
+      // an { error } result for either path.
+      const resolved =
+        mockInsertFn._resolvePromise ?? Promise.resolve({ data: null, error: null })
       return {
         select: () => ({
-          single: () => mockInsertFn._resolvePromise ?? Promise.resolve({ data: null, error: null }),
+          single: () => resolved,
         }),
+        // Array insert is directly awaitable: `await supabase.from('items').insert(array)`
+        // resolves the same { data, error } promise (undoClear).
+        then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+          resolved.then(resolve, reject),
       }
     },
     select: () => ({
