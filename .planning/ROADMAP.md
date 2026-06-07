@@ -180,7 +180,7 @@ Plans:
 
 **Wave 1** *(blocked on Wave 0)*
 
-- [ ] 14-02-PLAN.md — Leaf utilities: haptics.ts (QOL-03) + categories.ts checkedToBottom sort key (QOL-02) + persisted preferencesStore.ts (QOL-02)
+- [x] 14-02-PLAN.md — Leaf utilities: haptics.ts (QOL-03) + categories.ts checkedToBottom sort key (QOL-02) + persisted preferencesStore.ts (QOL-02)
 - [ ] 14-03-PLAN.md — AddItemBar auto-categorize prefill from per-list history + categoryTouched guard (QOL-01)
 
 **Wave 2** *(blocked on Wave 1)*
@@ -225,7 +225,7 @@ Plans:
 | 11. Profiles Foundation & Hardening | v2.1 | 9/10 | In Progress|  |
 | 12. Presence | v2.1 | 2/2 | Complete   | 2026-06-01 |
 | 13. Enhanced Items | v2.1 | 8/8 | Complete   | 2026-06-06 |
-| 14. Shopping Flow & QoL | v2.1 | 1/5 | In Progress|  |
+| 14. Shopping Flow & QoL | v2.1 | 2/5 | In Progress|  |
 | 15. Keep-Alive & PWA | v2.1 | 0/TBD | Not started | - |
 
 ---
