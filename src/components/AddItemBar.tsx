@@ -48,25 +48,35 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
 
   // Fetch distinct item names on mount for autocomplete (D-01)
   useEffect(() => {
+    // WR-03: stale-response guard. If listId changes while this fetch is in flight (list
+    // switch), a late-resolving response for the PREVIOUS list must not overwrite the
+    // current list's history. The cleanup sets `ignore`, and we bail before setState.
+    let ignore = false
     async function loadDistinctItems() {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from('items')
         .select('name, category, quantity')
         .eq('list_id', listId)
         .order('created_at', { ascending: false })
-      if (data) {
-        // Deduplicate by lowercase name, keeping most recent (first)
-        const seen = new Set<string>()
-        const deduped = data.filter((item) => {
-          const key = item.name.toLowerCase()
-          if (seen.has(key)) return false
-          seen.add(key)
-          return true
-        })
-        setDistinctItems(deduped)
-      }
+      if (ignore) return
+      // WR-03: surface/swallow the error consistently with this component's pattern — on a
+      // failed fetch leave distinctItems as-is and skip setState (no throw; autocomplete and
+      // auto-categorize simply have no history to offer rather than clobbering with stale data).
+      if (error || !data) return
+      // Deduplicate by lowercase name, keeping most recent (first)
+      const seen = new Set<string>()
+      const deduped = data.filter((item) => {
+        const key = item.name.toLowerCase()
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+      setDistinctItems(deduped)
     }
     loadDistinctItems()
+    return () => {
+      ignore = true
+    }
   }, [listId])
 
   // Local prefix filter for autocomplete (D-02) + QOL-01 auto-categorize prefill.
