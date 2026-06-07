@@ -37,7 +37,7 @@ Full phase detail: [milestones/v2.0-ROADMAP.md](milestones/v2.0-ROADMAP.md)
 - [ ] **Phase 11: Profiles Foundation & Hardening** — Public profiles table, cross-user avatars/names, member management, RLS hardening
 - [x] **Phase 12: Presence** — Live indicator showing who else is viewing the same list (completed 2026-06-01)
 - [x] **Phase 13: Enhanced Items** — Notes, drag-to-reorder (cross-category), quantity steppers, duplicate warning, swipe-to-delete (completed 2026-06-05)
-- [ ] **Phase 14: Shopping Flow & QoL** — Undo clear, uncheck-all, item count badge, auto-categorize, checked-to-bottom toggle, haptic feedback
+- [x] **Phase 14: Shopping Flow & QoL** — Undo clear, uncheck-all, item count badge, auto-categorize, checked-to-bottom toggle, haptic feedback (completed 2026-06-07)
 - [ ] **Phase 15: Keep-Alive & PWA** — Supabase free-tier keep-alive, installable PWA (manifest-only, no offline caching)
 
 ## Phase Details
@@ -189,7 +189,7 @@ Plans:
 
 **Wave 3** *(blocked on Wave 2)*
 
-- [ ] 14-05-PLAN.md — UndoSnackbar component + ListPage wiring: count badge (VIEW-01), uncheck-all button+dialog (SHOP-06), checked-to-bottom toggle (QOL-02), undo snackbar mount (SHOP-05)
+- [x] 14-05-PLAN.md — UndoSnackbar component + ListPage wiring: count badge (VIEW-01), uncheck-all button+dialog (SHOP-06), checked-to-bottom toggle (QOL-02), undo snackbar mount (SHOP-05)
 
 **UI hint**: yes
 
@@ -225,7 +225,7 @@ Plans:
 | 11. Profiles Foundation & Hardening | v2.1 | 9/10 | In Progress|  |
 | 12. Presence | v2.1 | 2/2 | Complete   | 2026-06-01 |
 | 13. Enhanced Items | v2.1 | 8/8 | Complete   | 2026-06-06 |
-| 14. Shopping Flow & QoL | v2.1 | 4/5 | In Progress|  |
+| 14. Shopping Flow & QoL | v2.1 | 5/5 | Complete   | 2026-06-07 |
 | 15. Keep-Alive & PWA | v2.1 | 0/TBD | Not started | - |
 
 ---
