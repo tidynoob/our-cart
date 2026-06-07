@@ -1,5 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useItemsStore } from './itemsStore'
+import type { Item } from '@/types/item'
+
+// QOL-03 (D-12): toggleChecked fires triggerHaptic on the check-ON transition only.
+// Mock the module so we can assert call/no-call without touching navigator.vibrate.
+// RED until @/lib/haptics exists (Wave 1) AND toggleChecked imports + calls it.
+const mockTriggerHaptic = vi.fn()
+vi.mock('@/lib/haptics', () => ({
+  triggerHaptic: (...args: unknown[]) => mockTriggerHaptic(...args),
+}))
 
 // Chainable Supabase mock that supports:
 // .from().update().eq() -> Promise (toggleChecked)
@@ -17,10 +26,20 @@ function createMockFrom() {
   return {
     insert: (data: unknown) => {
       mockInsertFn(data)
+      // Single resolved promise shared by BOTH the .select().single() chain (addItem)
+      // and the direct-thenable array-insert path (undoClear's `.from('items').insert(buffered)`
+      // with no .select()). The _resolvePromise override hook lets error-path tests force
+      // an { error } result for either path.
+      const resolved =
+        mockInsertFn._resolvePromise ?? Promise.resolve({ data: null, error: null })
       return {
         select: () => ({
-          single: () => mockInsertFn._resolvePromise ?? Promise.resolve({ data: null, error: null }),
+          single: () => resolved,
         }),
+        // Array insert is directly awaitable: `await supabase.from('items').insert(array)`
+        // resolves the same { data, error } promise (undoClear).
+        then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+          resolved.then(resolve, reject),
       }
     },
     select: () => ({
@@ -36,7 +55,18 @@ function createMockFrom() {
       return {
         eq: (col: string, val: unknown) => {
           mockEqFn(col, val)
-          return mockUpdateFn._resolvePromise ?? Promise.resolve({ data: null, error: null })
+          // Return an object that is both thenable (single-eq chains: toggleChecked,
+          // updateItem, reorderItem) AND has .eq() for double-eq chains (uncheckAll's
+          // .update({checked:false}).eq('list_id').eq('checked',true)) — mirrors delete().
+          const resolvedPromise = mockUpdateFn._resolvePromise ?? Promise.resolve({ data: null, error: null })
+          return {
+            eq: (col2: string, val2: unknown) => {
+              mockEqFn(col2, val2)
+              return resolvedPromise
+            },
+            then: (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
+              resolvedPromise.then(resolve, reject),
+          }
         },
       }
     },
@@ -845,5 +875,296 @@ describe('itemsStore — reorderItem (ITEM-02)', () => {
     })
     const afterPartner = useItemsStore.getState().items.find((i) => i.id === 'r-produce-1')!
     expect(afterPartner.note).toBe('partner note')
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// RED (Wave 0, SHOP-05): clearChecked snapshot → lastCleared, undoClear, clearLastCleared.
+// `lastCleared`, `undoClear`, `clearLastCleared` do not exist on the store yet — these
+// fail (undefined field / not-a-function) until they land in itemsStore.ts (Wave 1).
+// Contracts pinned (D-01, Pattern 1):
+//   (a) clearChecked stores the pre-delete snapshot in lastCleared (SC-1)
+//   (b) undoClear re-inserts buffered rows PRESERVING original ids, dedups by id,
+//       empties lastCleared after, and rolls back on insert error
+//   (c) clearLastCleared empties the buffer without a network call
+// ──────────────────────────────────────────────────────────────────────────
+
+// Typed access to the not-yet-existing undo surface (RED until Wave 1).
+type StoreWithUndo = ReturnType<typeof useItemsStore.getState> & {
+  lastCleared: Item[]
+  undoClear: () => Promise<void>
+  clearLastCleared: () => void
+}
+function undoStore(): StoreWithUndo {
+  return useItemsStore.getState() as StoreWithUndo
+}
+
+describe('itemsStore — undoClear (SHOP-05)', () => {
+  const undoSeed = [
+    {
+      id: 'u-A', list_id: 'list-u', name: 'Apples', quantity: null, category: null,
+      checked: false, added_by: null, user_id: null,
+      created_at: '2026-01-01T00:00:00Z', note: null, position: 'a1',
+    },
+    {
+      id: 'u-B', list_id: 'list-u', name: 'Bananas', quantity: null, category: 'Produce',
+      checked: true, added_by: null, user_id: null,
+      created_at: '2026-01-01T00:01:00Z', note: 'ripe', position: 'a2',
+    },
+    {
+      id: 'u-C', list_id: 'list-u', name: 'Carrots', quantity: '3', category: 'Produce',
+      checked: true, added_by: null, user_id: null,
+      created_at: '2026-01-01T00:02:00Z', note: null, position: 'a3',
+    },
+  ]
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useItemsStore.setState({
+      items: undoSeed.map((i) => ({ ...i })),
+      loading: false,
+      error: null,
+      syncStatus: 'live',
+      channel: null,
+      lastCleared: [],
+    } as Partial<Parameters<typeof useItemsStore.setState>[0]>)
+    mockUpdateFn._resolvePromise = undefined
+    mockDeleteFn._resolvePromise = undefined
+    mockInsertFn._resolvePromise = undefined
+    resetCapturedCb()
+  })
+
+  it('clearChecked snapshots the pre-delete checked rows into lastCleared (D-01)', async () => {
+    mockDeleteFn._resolvePromise = Promise.resolve({ data: null, error: null })
+
+    await useItemsStore.getState().clearChecked('list-u')
+
+    const buffered = undoStore().lastCleared
+    expect(buffered.map((i) => i.id).sort()).toEqual(['u-B', 'u-C'])
+    // The snapshot preserves full row content (so undoClear can re-insert faithfully).
+    expect(buffered.find((i) => i.id === 'u-B')?.note).toBe('ripe')
+    expect(buffered.find((i) => i.id === 'u-C')?.quantity).toBe('3')
+  })
+
+  it('undoClear re-adds buffered rows PRESERVING original ids and empties lastCleared', async () => {
+    mockDeleteFn._resolvePromise = Promise.resolve({ data: null, error: null })
+    mockInsertFn._resolvePromise = Promise.resolve({ data: null, error: null })
+
+    await useItemsStore.getState().clearChecked('list-u')
+    // After clear: only the unchecked u-A remains, buffer holds u-B + u-C.
+    expect(useItemsStore.getState().items.map((i) => i.id)).toEqual(['u-A'])
+
+    await undoStore().undoClear()
+
+    const ids = useItemsStore.getState().items.map((i) => i.id).sort()
+    expect(ids).toEqual(['u-A', 'u-B', 'u-C'])
+    // Original ids preserved (not regenerated).
+    expect(useItemsStore.getState().items.find((i) => i.id === 'u-B')).toBeDefined()
+    expect(useItemsStore.getState().items.find((i) => i.id === 'u-C')).toBeDefined()
+    // Buffer emptied after a successful undo (snackbar disappears).
+    expect(undoStore().lastCleared).toEqual([])
+    // The re-insert carried the original ids (Open Question A1 → .insert(buffered)).
+    const insertArg = mockInsertFn.mock.calls.at(-1)?.[0] as Array<{ id: string }> | undefined
+    expect(Array.isArray(insertArg)).toBe(true)
+    expect(insertArg!.map((r) => r.id).sort()).toEqual(['u-B', 'u-C'])
+  })
+
+  it('undoClear dedups by id: a row already re-present (INSERT echo) is NOT duplicated (Pitfall 1)', async () => {
+    mockDeleteFn._resolvePromise = Promise.resolve({ data: null, error: null })
+    mockInsertFn._resolvePromise = Promise.resolve({ data: null, error: null })
+
+    await useItemsStore.getState().clearChecked('list-u')
+    // Simulate a Realtime INSERT echo landing u-B back BEFORE undoClear runs.
+    useItemsStore.setState((s) => ({
+      items: [...s.items, undoSeed.find((i) => i.id === 'u-B')!],
+    }))
+
+    await undoStore().undoClear()
+
+    const bCount = useItemsStore.getState().items.filter((i) => i.id === 'u-B').length
+    expect(bCount).toBe(1)
+  })
+
+  it('undoClear rolls back (removes the buffered ids) and sets an error on insert failure', async () => {
+    mockDeleteFn._resolvePromise = Promise.resolve({ data: null, error: null })
+    mockInsertFn._resolvePromise = Promise.resolve({ data: null, error: { message: 'DB error' } })
+
+    await useItemsStore.getState().clearChecked('list-u')
+    await undoStore().undoClear()
+
+    // Buffered rows must NOT linger in items after a failed re-insert.
+    const ids = useItemsStore.getState().items.map((i) => i.id)
+    expect(ids).not.toContain('u-B')
+    expect(ids).not.toContain('u-C')
+    expect(useItemsStore.getState().error).toBeTruthy()
+  })
+
+  it('clearLastCleared empties the buffer without a network insert', async () => {
+    mockDeleteFn._resolvePromise = Promise.resolve({ data: null, error: null })
+    await useItemsStore.getState().clearChecked('list-u')
+    expect(undoStore().lastCleared.length).toBeGreaterThan(0)
+
+    undoStore().clearLastCleared()
+
+    expect(undoStore().lastCleared).toEqual([])
+    expect(mockInsertFn).not.toHaveBeenCalled()
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// RED (Wave 0, SHOP-06): uncheckAll. `uncheckAll` does not exist on the store yet —
+// these fail (not-a-function) until it lands in itemsStore.ts (Wave 1).
+// Contracts pinned (D-04, Pattern 2):
+//   (a) optimistic: every checked item flips checked:false immediately
+//   (b) ONE filtered update (.update({checked:false}).eq(list_id).eq(checked,true))
+//   (c) bulk rollback of the snapshotted ids on error
+//   (d) does NOT route through pendingReorders (Pitfall 3) — two UPDATE echoes for
+//       one id yield one stable result
+// ──────────────────────────────────────────────────────────────────────────
+
+type StoreWithUncheck = ReturnType<typeof useItemsStore.getState> & {
+  uncheckAll: (listId: string) => Promise<void>
+}
+function uncheckStore(): StoreWithUncheck {
+  return useItemsStore.getState() as StoreWithUncheck
+}
+
+describe('itemsStore — uncheckAll (SHOP-06)', () => {
+  const uncheckSeed = [
+    {
+      id: 'k-A', list_id: 'list-k', name: 'Apples', quantity: null, category: null,
+      checked: false, added_by: null, user_id: null,
+      created_at: '2026-01-01T00:00:00Z', note: null, position: 'a1',
+    },
+    {
+      id: 'k-B', list_id: 'list-k', name: 'Bananas', quantity: null, category: null,
+      checked: true, added_by: null, user_id: null,
+      created_at: '2026-01-01T00:01:00Z', note: null, position: 'a2',
+    },
+    {
+      id: 'k-C', list_id: 'list-k', name: 'Carrots', quantity: null, category: null,
+      checked: true, added_by: null, user_id: null,
+      created_at: '2026-01-01T00:02:00Z', note: null, position: 'a3',
+    },
+  ]
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useItemsStore.setState({
+      items: uncheckSeed.map((i) => ({ ...i })),
+      loading: false,
+      error: null,
+      syncStatus: 'live',
+      channel: null,
+    })
+    mockUpdateFn._resolvePromise = undefined
+    resetCapturedCb()
+  })
+
+  it('optimistic: flips every checked item to checked:false before Supabase resolves', async () => {
+    let resolveUpdate!: (value: unknown) => void
+    const pending = new Promise((res) => { resolveUpdate = res })
+    mockUpdateFn._resolvePromise = pending
+
+    const p = uncheckStore().uncheckAll('list-k')
+
+    const items = useItemsStore.getState().items
+    expect(items.every((i) => !i.checked)).toBe(true)
+
+    resolveUpdate({ data: null, error: null })
+    await p
+  })
+
+  it('issues a SINGLE filtered update: .update({checked:false}).eq(list_id).eq(checked,true)', async () => {
+    mockUpdateFn._resolvePromise = Promise.resolve({ data: null, error: null })
+
+    await uncheckStore().uncheckAll('list-k')
+
+    expect(mockUpdateFn).toHaveBeenCalledTimes(1)
+    expect(mockUpdateFn).toHaveBeenCalledWith({ checked: false })
+    expect(mockEqFn).toHaveBeenCalledWith('list_id', 'list-k')
+    expect(mockEqFn).toHaveBeenCalledWith('checked', true)
+  })
+
+  it('bulk rollback: restores the checked flag on snapshotted ids and sets an error on failure', async () => {
+    mockUpdateFn._resolvePromise = Promise.resolve({ data: null, error: { message: 'DB error' } })
+
+    await uncheckStore().uncheckAll('list-k')
+
+    const items = useItemsStore.getState().items
+    expect(items.find((i) => i.id === 'k-B')?.checked).toBe(true)
+    expect(items.find((i) => i.id === 'k-C')?.checked).toBe(true)
+    // The originally-unchecked item stays unchecked (not flipped on by rollback).
+    expect(items.find((i) => i.id === 'k-A')?.checked).toBe(false)
+    expect(useItemsStore.getState().error).toBeTruthy()
+  })
+
+  it('no-op when nothing is checked: does not call Supabase update', async () => {
+    useItemsStore.setState({
+      items: [{ ...uncheckSeed[0] }],
+      loading: false, error: null, syncStatus: 'live', channel: null,
+    })
+
+    await uncheckStore().uncheckAll('list-k')
+
+    expect(mockUpdateFn).not.toHaveBeenCalled()
+  })
+
+  it('does NOT route through pendingReorders: two UPDATE echoes for one id yield one stable result (Pitfall 3)', async () => {
+    mockUpdateFn._resolvePromise = Promise.resolve({ data: null, error: null })
+
+    // Wire the realtime channel so we can fire UPDATE payloads through the reducer.
+    useItemsStore.getState().subscribeToList('list-k')
+    const onCalls = mockChannelOn.mock.calls
+    const payloadCb = onCalls[onCalls.length - 1][2] as (p: Record<string, unknown>) => void
+
+    await uncheckStore().uncheckAll('list-k')
+
+    // Two own-write UPDATE echoes for k-B carrying checked:false — both must merge
+    // idempotently (uncheck-all must NOT consume-and-skip via pendingReorders, or the
+    // first echo would be dropped and the row could flicker back to checked).
+    const echoRow = { ...uncheckSeed[1], checked: false }
+    payloadCb({ eventType: 'UPDATE', new: echoRow, old: uncheckSeed[1] })
+    payloadCb({ eventType: 'UPDATE', new: echoRow, old: uncheckSeed[1] })
+
+    const after = useItemsStore.getState().items.find((i) => i.id === 'k-B')!
+    expect(after.checked).toBe(false)
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// RED (Wave 0, QOL-03): toggleChecked fires triggerHaptic on check-ON ONLY (D-12).
+// triggerHaptic is mocked at the top of this file. RED until toggleChecked imports
+// @/lib/haptics and calls it on the nextChecked === true transition.
+// ──────────────────────────────────────────────────────────────────────────
+describe('itemsStore — haptic on check (QOL-03)', () => {
+  const hapticSeed = {
+    id: 'h-1', list_id: 'list-h', name: 'Milk', quantity: null, category: null,
+    checked: false, added_by: null, user_id: null,
+    created_at: '2026-01-01T00:00:00Z', note: null, position: 'a1',
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    useItemsStore.setState({
+      items: [{ ...hapticSeed }],
+      loading: false, error: null, syncStatus: 'live', channel: null,
+    })
+    mockUpdateFn._resolvePromise = Promise.resolve({ data: null, error: null })
+  })
+
+  it('fires triggerHaptic on the check-ON transition (false → true)', async () => {
+    await useItemsStore.getState().toggleChecked('h-1')
+    expect(mockTriggerHaptic).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT fire triggerHaptic on the check-OFF transition (true → false)', async () => {
+    useItemsStore.setState({
+      items: [{ ...hapticSeed, checked: true }],
+      loading: false, error: null, syncStatus: 'live', channel: null,
+    })
+
+    await useItemsStore.getState().toggleChecked('h-1')
+    expect(mockTriggerHaptic).not.toHaveBeenCalled()
   })
 })

@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { nanoid } from 'nanoid'
 import { supabase } from '@/lib/supabase'
 import { computeReorderKey, safeReorderKey, byPosition } from '@/lib/ordering'
+import { triggerHaptic } from '@/lib/haptics'
 import type { Item } from '@/types/item'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -28,6 +29,9 @@ interface ItemsState {
   error: string | null
   syncStatus: 'connecting' | 'live' | 'reconnecting'
   channel: RealtimeChannel | null
+  // SHOP-05 (D-01): pre-delete snapshot of the rows cleared by the last clearChecked,
+  // held so undoClear can re-insert them verbatim. Empty when no undo is pending.
+  lastCleared: Item[]
 
   fetchItems: (listId: string, options?: { background?: boolean }) => Promise<void>
   addItem: (
@@ -46,6 +50,9 @@ interface ItemsState {
   reorderItem: (activeId: string, overId: string) => Promise<void>
   toggleChecked: (id: string) => Promise<void>
   clearChecked: (listId: string) => Promise<void>
+  uncheckAll: (listId: string) => Promise<void>
+  undoClear: () => Promise<void>
+  clearLastCleared: () => void
   subscribeToList: (listId: string) => void
   unsubscribe: () => void
 }
@@ -56,6 +63,7 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
   error: null,
   syncStatus: 'connecting',
   channel: null,
+  lastCleared: [],
 
   fetchItems: async (listId, { background = false } = {}) => {
     // CR-02 fix: background mode skips loading indicator when items already exist,
@@ -281,6 +289,11 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
 
     const nextChecked = !prev.checked
 
+    // QOL-03 / D-12: fire a single haptic pulse on the check-ON transition only.
+    // The user's tap satisfies sticky user activation; fire here (not from the realtime
+    // echo branch) so the partner's check-off never buzzes this device.
+    if (nextChecked) triggerHaptic()
+
     // Optimistic update: flip checked on matching item
     set((state) => ({
       items: state.items.map((i) =>
@@ -310,9 +323,12 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
     const checkedItems = get().items.filter((i) => i.checked)
     if (checkedItems.length === 0) return
 
-    // Optimistic bulk remove — remove all checked items immediately
+    // Optimistic bulk remove — remove all checked items immediately.
+    // D-01 (SHOP-05): promote the pre-delete snapshot into lastCleared so undoClear
+    // can re-insert these exact rows; the UndoSnackbar renders off a non-empty buffer.
     set((state) => ({
       items: state.items.filter((i) => !i.checked),
+      lastCleared: checkedItems,
       error: null,
     }))
 
@@ -325,18 +341,110 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
     if (error) {
       // Bulk rollback: restore removed items + error in single set() call (CR-02).
       // Dedup against current ids so a concurrent re-insert can't double an item (CR-01).
+      // Clear lastCleared too — a failed clear must not leave a stale undo buffer (D-01).
       // SYNC-03: If offline, also set syncStatus to 'reconnecting' (belt-and-suspenders).
       set((state) => {
         const present = new Set(state.items.map((i) => i.id))
         const restored = checkedItems.filter((i) => !present.has(i.id))
         return {
           items: [...state.items, ...restored],
+          lastCleared: [],
           error: 'Failed to clear items',
           syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
         }
       })
     }
   },
+
+  uncheckAll: async (listId) => {
+    // SHOP-06 / D-04: bulk "re-shop" — flip every checked item back to unchecked in a
+    // single filtered update. Mirrors clearChecked's snapshot-before-set + bulk rollback.
+    // Snapshot BEFORE optimistic set (Pitfall 4 — read before set()).
+    const checkedItems = get().items.filter((i) => i.checked)
+    if (checkedItems.length === 0) return
+
+    // Optimistic flip: every checked item -> checked:false immediately.
+    set((state) => ({
+      items: state.items.map((i) => (i.checked ? { ...i, checked: false } : i)),
+      error: null,
+    }))
+
+    // ONE filtered server-side update scoped to this list's checked rows. Do NOT route
+    // these ids through pendingReorders — that one-shot guard is reorder-specific and would
+    // drop the first UPDATE echo (Pitfall 3); the UPDATE branch is already idempotent.
+    const { error } = await supabase
+      .from('items')
+      .update({ checked: false })
+      .eq('list_id', listId)
+      .eq('checked', true)
+
+    if (error) {
+      // Bulk rollback: restore checked:true on exactly the snapshotted ids (do not touch
+      // rows that were already unchecked). SYNC-03: offline -> syncStatus 'reconnecting'.
+      const snapshotIds = new Set(checkedItems.map((i) => i.id))
+      set((state) => ({
+        items: state.items.map((i) =>
+          snapshotIds.has(i.id) ? { ...i, checked: true } : i
+        ),
+        error: 'Failed to uncheck items',
+        syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
+      }))
+    }
+  },
+
+  undoClear: async () => {
+    // SHOP-05 / D-01: re-insert the rows buffered by the last clearChecked, preserving
+    // their original ids so the Realtime INSERT echo (own + partner) is a reducer no-op.
+    const buffered = get().lastCleared
+    if (buffered.length === 0) return
+
+    // Optimistic re-add deduped by id (Pitfall 1): a row already re-present (e.g. an
+    // INSERT echo landed first) must not be duplicated. Empty the buffer in the SAME set
+    // so the snackbar disappears immediately on undo.
+    set((state) => {
+      const present = new Set(state.items.map((i) => i.id))
+      const toAdd = buffered.filter((i) => !present.has(i.id))
+      return { items: [...state.items, ...toAdd], lastCleared: [], error: null }
+    })
+
+    // CR-01: re-insert only the column whitelist that addItem uses, mirroring the insert
+    // contract — do NOT re-send DB-managed columns. A1 verdict (14-01): items.id ACCEPTS a
+    // client-supplied UUID on INSERT, so the original `id` IS preserved (the Realtime INSERT
+    // echo is then idempotent-by-id). But `created_at` and `user_id` are NOT re-sent: let the
+    // DB defaults apply (user_id DEFAULT auth.uid() — items_auth.sql — sets the current user,
+    // exactly as addItem relies on; created_at gets a fresh server timestamp). RLS gates only
+    // by list_id membership (items_membership.sql); the buffer only holds rows the user just
+    // cleared on their own list, so the whitelist passes WITH CHECK.
+    const rows = buffered.map((i) => ({
+      id: i.id,
+      list_id: i.list_id,
+      name: i.name,
+      quantity: i.quantity,
+      category: i.category,
+      added_by: i.added_by,
+      checked: i.checked,
+      note: i.note,
+      position: i.position,
+    }))
+    const { error } = await supabase.from('items').insert(rows)
+
+    if (error) {
+      // Rollback: remove the optimistically re-added buffered ids again.
+      // WR-05: restore lastCleared so the buffer is not lost — the snackbar reappears and
+      // the user can retry the undo. The cleared rows were already DELETEd server-side by
+      // clearChecked, so without this restore a failed undo would lose them permanently.
+      // SYNC-03: If offline, also set syncStatus to 'reconnecting' (belt-and-suspenders).
+      const bufferedIds = new Set(buffered.map((i) => i.id))
+      set((state) => ({
+        items: state.items.filter((i) => !bufferedIds.has(i.id)),
+        lastCleared: buffered,
+        error: 'Failed to restore items',
+        syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
+      }))
+    }
+  },
+
+  clearLastCleared: () => set({ lastCleared: [] }),
 
   subscribeToList: (listId: string) => {
     // Clean up any existing channel before creating a new one (StrictMode double-mount guard — D-09).
@@ -345,7 +453,9 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
     const existing = get().channel
     if (existing) supabase.removeChannel(existing)
 
-    set({ syncStatus: 'connecting' })
+    // Pitfall 2: drop any pending undo buffer on list-switch so a cross-list undo
+    // (re-inserting the prior list's rows) can never fire (Open Question 2 -> yes).
+    set({ syncStatus: 'connecting', lastCleared: [] })
 
     const channel = supabase
       .channel(`items-${listId}`)
@@ -421,12 +531,14 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
                 if (inFlightListId === listId) inFlightListId = null
               })
               .catch(() => {
-                // WR-01 fix: On failure, clear guard immediately so any subsequent
-                // SUBSCRIBED callback can trigger a fresh fetch. Without this, a
-                // SUBSCRIBED callback that fired (and was skipped) while this fetch
-                // was in-flight would leave the user with stale/missing items and
-                // no automatic recovery path.
-                inFlightListId = null
+                // WR-04: clear the guard ONLY if it still belongs to THIS list. A rapid
+                // list switch (A → B) may have already set inFlightListId='B' with B's fetch
+                // legitimately in flight; an unconditional reset here would clear B's guard
+                // and permit a redundant concurrent fetch for B. Mirroring the .then's
+                // conditional keeps the dedup guarantee airtight across rapid switches.
+                // (When the guard does still equal this listId, clearing it on failure lets
+                // a subsequent SUBSCRIBED callback trigger a fresh recovery fetch.)
+                if (inFlightListId === listId) inFlightListId = null
               })
           }
         } else {
@@ -443,7 +555,8 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
     const channel = get().channel
     if (channel) {
       supabase.removeChannel(channel)
-      set({ channel: null, syncStatus: 'connecting' })
+      // Pitfall 2: clear the undo buffer on teardown so a stale cross-list undo cannot fire.
+      set({ channel: null, syncStatus: 'connecting', lastCleared: [] })
     }
   },
 }))

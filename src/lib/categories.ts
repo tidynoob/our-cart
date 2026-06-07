@@ -48,9 +48,14 @@ export type CategoryGroup = (typeof CATEGORY_ORDER)[number]
  * - Items within a category are sorted by `position` (lexicographic), with a
  *   `created_at` fallback for null positions (legacy rows) — the single ordering
  *   chokepoint, so CategorySection/ListPage need no sort logic (D-09).
+ * - When `checkedToBottom` is true, checked items sink to the BOTTOM OF THEIR
+ *   OWN category section (not a global pile); ties within each checked/unchecked
+ *   group are broken by `byPosition`. The preference is passed in by the caller
+ *   (QOL-02 / D-09) — this lib stays PURE and never imports the prefs store.
  */
 export function groupItemsByCategory(
-  items: Item[]
+  items: Item[],
+  checkedToBottom = false
 ): { category: CategoryGroup; items: Item[] }[] {
   const groups = new Map<CategoryGroup, Item[]>()
 
@@ -73,9 +78,15 @@ export function groupItemsByCategory(
   }
 
   // Return in predefined order, omitting empty categories.
-  // Sort each group by position (lexicographic) with created_at fallback (D-09).
+  // Sort each group by position (lexicographic) with created_at fallback (D-09);
+  // when checkedToBottom, sink checked below unchecked WITHIN the section first.
   return CATEGORY_ORDER.filter((cat) => groups.has(cat)).map((cat) => ({
     category: cat,
-    items: groups.get(cat)!.sort(byPosition),
+    items: groups.get(cat)!.sort((a, b) => {
+      if (checkedToBottom && a.checked !== b.checked) {
+        return a.checked ? 1 : -1
+      }
+      return byPosition(a, b)
+    }),
   }))
 }

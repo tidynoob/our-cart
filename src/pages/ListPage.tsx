@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { Menu, Pencil, Share2, Trash2, Users } from 'lucide-react'
+import { ArrowDownToLine, Menu, Pencil, Share2, Trash2, Users } from 'lucide-react'
 import {
   DndContext,
   closestCenter,
@@ -18,6 +18,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useUIStore } from '@/stores/uiStore'
 import { useItemsStore } from '@/stores/itemsStore'
+import { usePreferencesStore } from '@/stores/preferencesStore'
 import { useProfilesStore } from '@/stores/profilesStore'
 import { usePresenceStore } from '@/stores/presenceStore'
 import { useListsStore } from '@/stores/listsStore'
@@ -27,6 +28,7 @@ import type { Item } from '@/types/item'
 import { resolveDisplayName } from '@/lib/displayName'
 import { ShareBanner } from '@/components/ShareBanner'
 import { AddItemBar } from '@/components/AddItemBar'
+import { UndoSnackbar } from '@/components/UndoSnackbar'
 import { CategorySection } from '@/components/CategorySection'
 import { SyncStatus } from '@/components/SyncStatus'
 import { PresenceIndicator } from '@/components/PresenceIndicator'
@@ -71,6 +73,9 @@ export default function ListPage() {
   // Clear dialog state — ephemeral UI, not Zustand
   const [clearDialogOpen, setClearDialogOpen] = useState(false)
 
+  // Uncheck-all confirm dialog state (SHOP-06) — ephemeral UI, mirrors clearDialogOpen
+  const [uncheckDialogOpen, setUncheckDialogOpen] = useState(false)
+
   // List rename state — ephemeral UI, not Zustand
   const [listRenameOpen, setListRenameOpen] = useState(false)
   const [listRenameName, setListRenameName] = useState('')
@@ -106,7 +111,13 @@ export default function ListPage() {
   const deleteItem = useItemsStore((state) => state.deleteItem)
   const toggleChecked = useItemsStore((state) => state.toggleChecked)
   const clearChecked = useItemsStore((state) => state.clearChecked)
+  const uncheckAll = useItemsStore((state) => state.uncheckAll)
   const reorderItem = useItemsStore((state) => state.reorderItem)
+
+  // QOL-02: checked-to-bottom sort preference (persisted localStorage 'our-cart-prefs').
+  // Device-local, not synced to the partner. Fed into groupItemsByCategory below.
+  const checkedToBottom = usePreferencesStore((state) => state.checkedToBottom)
+  const toggleCheckedToBottom = usePreferencesStore((state) => state.toggleCheckedToBottom)
 
   // dnd-kit sensors (ITEM-02 / RESEARCH Pattern 1): PointerSensor with an 8px
   // activation distance so tap/scroll/swipe don't start a drag (Pitfall 4), plus
@@ -118,6 +129,8 @@ export default function ListPage() {
 
   // Derived from store — no new state field (per research: items.filter(i => i.checked).length)
   const checkedCount = items.filter((i) => i.checked).length
+  // VIEW-01: total item count for the count badge (pure derive, zero new state — D-06)
+  const totalCount = items.length
 
   // D-06 Pitfall 5 fix: derive live name from listsStore cache when available.
   // Falls back to local list state so direct-URL navigation (D-03) still works.
@@ -321,7 +334,17 @@ export default function ListPage() {
   function handleClearConfirm() {
     setClearDialogOpen(false)
     // Store handles optimistic remove, rollback, and error state internally (SHOP-03).
+    // clearChecked now also populates lastCleared → the UndoSnackbar appears (SHOP-05).
     clearChecked(list!.id).catch(() => {})
+  }
+
+  // --- Uncheck All Handler (SHOP-06 / D-05) ---
+
+  /** Close dialog and bulk-uncheck all checked items optimistically via store. */
+  function handleUncheckConfirm() {
+    setUncheckDialogOpen(false)
+    // Store handles optimistic flip-all, rollback, and error state internally (SHOP-06).
+    uncheckAll(list!.id).catch(() => {})
   }
 
   // --- List Rename Handlers (D-06) ---
@@ -340,8 +363,18 @@ export default function ListPage() {
   /** Save the new list name via store (optimistic update). */
   async function handleListRename() {
     if (!listRenameName.trim()) return
-    await renameList(list!.id, listRenameName.trim())
-    setListRenameOpen(false)
+    // WR-06: guard the async mutation. Without try/catch a network throw from renameList
+    // leaves the rename dialog stuck open (unhandled rejection). The store owns optimistic
+    // update + rollback + error state; we only need to close the dialog once it settles
+    // (success OR failure) so the UI never freezes. Mirrors the .catch(() => {}) pattern
+    // used by every other mutation handler in this file.
+    try {
+      await renameList(list!.id, listRenameName.trim())
+    } catch {
+      // Store surfaces the error; just don't leave the dialog wedged.
+    } finally {
+      setListRenameOpen(false)
+    }
   }
 
   // --- List Delete Handlers (D-08) ---
@@ -349,10 +382,18 @@ export default function ListPage() {
   /** Confirm delete: await store action then navigate away so deleted URL is unreachable. */
   async function handleListDeleteConfirm() {
     setDeleteListLoading(true)
-    // Pitfall 3: navigate only after DB confirms — store optimistic remove already happened.
-    await deleteList(list!.id)
-    setDeleteListLoading(false)
-    navigate('/')
+    // WR-06: guard the async delete. On a throw the await rejects, so without try/catch
+    // deleteListLoading is never reset and the dialog freezes on a permanent "Deleting…"
+    // button (the navigate never runs either). Navigate ONLY on success so a half-failed
+    // delete can't strand the user away from a list that still exists; on failure re-enable
+    // the controls so the user can retry or cancel. The store surfaces the error.
+    try {
+      // Pitfall 3: navigate only after DB confirms — store optimistic remove already happened.
+      await deleteList(list!.id)
+      navigate('/')
+    } catch {
+      setDeleteListLoading(false)
+    }
   }
 
   if (loading) {
@@ -374,7 +415,7 @@ export default function ListPage() {
     )
   }
 
-  const grouped = groupItemsByCategory(items)
+  const grouped = groupItemsByCategory(items, checkedToBottom)
   // Flat id list (grouped/sorted order) for the single list-wide SortableContext.
   const flatItemIds = grouped.flatMap((g) => g.items.map((i) => i.id))
 
@@ -401,7 +442,7 @@ export default function ListPage() {
       )}
 
       <div className="w-full max-w-md p-4">
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center justify-between gap-1">
           <Button
             ref={triggerRef}
             variant="ghost"
@@ -435,7 +476,18 @@ export default function ListPage() {
             </div>
           ) : (
             <div className="flex items-center gap-2 min-w-0 flex-1">
-              <h1 className="text-2xl font-semibold truncate">{displayName}</h1>
+              <div className="min-w-0 flex-1">
+                <h1 className="text-2xl font-semibold truncate">{displayName}</h1>
+                {/* VIEW-01: live count badge under the title (UI-SPEC §3) — hidden when empty */}
+                {totalCount > 0 && (
+                  <span
+                    className="text-sm text-muted-foreground"
+                    aria-live="polite"
+                  >
+                    {checkedCount} / {totalCount} checked
+                  </span>
+                )}
+              </div>
               {isOwner && (
                 <div className="flex items-center gap-1 shrink-0">
                   <Button
@@ -474,6 +526,22 @@ export default function ListPage() {
               <Share2 className="h-4 w-4" />
             </Button>
           )}
+          {/* Checked-to-bottom toggle (QOL-02 / D-11) — persistent icon Button (not a
+              shadcn Switch); accent when ON. Reads/writes usePreferencesStore. */}
+          <Button
+            variant="ghost"
+            size="icon"
+            aria-pressed={checkedToBottom}
+            aria-label={
+              checkedToBottom
+                ? 'Stop sorting checked items to bottom'
+                : 'Sort checked items to bottom'
+            }
+            onClick={toggleCheckedToBottom}
+            className={`h-8 w-8 shrink-0 ${checkedToBottom ? 'text-primary' : 'text-muted-foreground'}`}
+          >
+            <ArrowDownToLine className="h-4 w-4" />
+          </Button>
           {/* Members management button (D-07) — visible to all authenticated list members */}
           <Button
             variant="ghost"
@@ -558,18 +626,30 @@ export default function ListPage() {
             </DndContext>
           )}
 
-          {/* Clear completed button — only rendered when checked items exist (D-06) */}
+          {/* Action stack — bulk actions only rendered when checked items exist (D-06).
+              Uncheck all (SHOP-06) sits with Clear completed (UI-SPEC §2). */}
           {!itemsLoading && checkedCount > 0 && (
-            <div className="px-4">
+            <div className="px-4 flex flex-col gap-2 mt-4">
               <Button
                 variant="outline"
-                className="w-full mt-4"
+                className="w-full min-h-[44px]"
+                onClick={() => setUncheckDialogOpen(true)}
+              >
+                Uncheck all ({checkedCount})
+              </Button>
+              <Button
+                variant="outline"
+                className="w-full min-h-[44px]"
                 onClick={() => setClearDialogOpen(true)}
               >
                 Clear completed ({checkedCount})
               </Button>
             </div>
           )}
+
+          {/* Undo-clear snackbar (SHOP-05) — bottom of list content, inline (UI-SPEC §1).
+              Self-gates on lastCleared (renders null when empty). */}
+          <UndoSnackbar />
         </div>
       </div>
 
@@ -595,6 +675,33 @@ export default function ListPage() {
               onClick={handleClearConfirm}
             >
               Clear Items
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Uncheck-all confirmation dialog (SHOP-06 / D-05) — mirrors the Clear dialog
+          exactly; disablePointerDismissal blocks accidental backdrop tap mid-shop. */}
+      <Dialog
+        open={uncheckDialogOpen}
+        onOpenChange={(open) => setUncheckDialogOpen(open)}
+        disablePointerDismissal
+      >
+        <DialogContent showCloseButton={false}>
+          <DialogHeader>
+            <DialogTitle>
+              Uncheck {checkedCount} item{checkedCount !== 1 ? 's' : ''}?
+            </DialogTitle>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUncheckDialogOpen(false)}>
+              Keep checked
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleUncheckConfirm}
+            >
+              Uncheck all
             </Button>
           </DialogFooter>
         </DialogContent>

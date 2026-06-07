@@ -163,3 +163,67 @@ describe('groupItemsByCategory — position sort (ITEM-02)', () => {
     expect(groups[0].items.map((i) => i.name)).toEqual(['Earlier', 'Later'])
   })
 })
+
+// ──────────────────────────────────────────────────────────────────────────
+// RED (Wave 0, QOL-02 / D-09): groupItemsByCategory(items, checkedToBottom).
+// The second arg does not exist yet — groupItemsByCategory currently sorts purely
+// by byPosition and ignores `checked`. These fail until the checkedToBottom
+// comparator lands (Wave 1). Contract: checked items sink to the BOTTOM OF THEIR OWN
+// category section (NOT a global pile); when false / omitted, order === pure byPosition.
+// ──────────────────────────────────────────────────────────────────────────
+describe('groupItemsByCategory — checkedToBottom (QOL-02)', () => {
+  it('sinks checked items to the bottom WITHIN each category section when true', () => {
+    // Produce: B(checked,a1) before A(unchecked,a2) by position; with sink ON,
+    // unchecked A must come first, checked B last — within Produce only.
+    const items = [
+      makeItem({ name: 'B-checked', category: 'Produce', position: 'a1', checked: true }),
+      makeItem({ name: 'A-unchecked', category: 'Produce', position: 'a2', checked: false }),
+      // Dairy has its own independent section with the same shape.
+      makeItem({ name: 'D-checked', category: 'Dairy', position: 'a1', checked: true }),
+      makeItem({ name: 'C-unchecked', category: 'Dairy', position: 'a2', checked: false }),
+    ]
+
+    const groups = groupItemsByCategory(items, true)
+    const produce = groups.find((g) => g.category === 'Produce')!
+    const dairy = groups.find((g) => g.category === 'Dairy')!
+
+    // Per-section sink — unchecked above checked inside EACH section, not globally.
+    expect(produce.items.map((i) => i.name)).toEqual(['A-unchecked', 'B-checked'])
+    expect(dairy.items.map((i) => i.name)).toEqual(['C-unchecked', 'D-checked'])
+  })
+
+  it('keeps unchecked items in pure byPosition order WITHIN their checked group', () => {
+    // Two unchecked + two checked in one section: each group internally byPosition.
+    const items = [
+      makeItem({ name: 'u2', category: 'Produce', position: 'a4', checked: false }),
+      makeItem({ name: 'u1', category: 'Produce', position: 'a1', checked: false }),
+      makeItem({ name: 'c2', category: 'Produce', position: 'a3', checked: true }),
+      makeItem({ name: 'c1', category: 'Produce', position: 'a2', checked: true }),
+    ]
+
+    const groups = groupItemsByCategory(items, true)
+    // unchecked (u1<u2 by position) first, then checked (c1<c2 by position).
+    expect(groups[0].items.map((i) => i.name)).toEqual(['u1', 'u2', 'c1', 'c2'])
+  })
+
+  it('equals pure byPosition order when checkedToBottom is false', () => {
+    const items = [
+      makeItem({ name: 'B-checked', category: 'Produce', position: 'a1', checked: true }),
+      makeItem({ name: 'A-unchecked', category: 'Produce', position: 'a2', checked: false }),
+    ]
+
+    const groups = groupItemsByCategory(items, false)
+    // No sink: pure byPosition (a1 before a2) regardless of checked.
+    expect(groups[0].items.map((i) => i.name)).toEqual(['B-checked', 'A-unchecked'])
+  })
+
+  it('defaults to pure byPosition order when the arg is omitted (backward compatible)', () => {
+    const items = [
+      makeItem({ name: 'B-checked', category: 'Produce', position: 'a1', checked: true }),
+      makeItem({ name: 'A-unchecked', category: 'Produce', position: 'a2', checked: false }),
+    ]
+
+    const groups = groupItemsByCategory(items)
+    expect(groups[0].items.map((i) => i.name)).toEqual(['B-checked', 'A-unchecked'])
+  })
+})
