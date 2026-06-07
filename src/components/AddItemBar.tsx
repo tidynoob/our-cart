@@ -20,6 +20,12 @@ interface AddItemBarProps {
   addedBy: string
 }
 
+// WR-02: non-empty sentinel for the "None" category option. base-ui's Select treats an
+// empty-string value as "no selection" (shows the placeholder), so '' cannot be a distinct,
+// selectable item. The control uses this sentinel; '' is the canonical "no category" state
+// everywhere else (and what addItem receives → null category column).
+const NONE_CATEGORY_VALUE = '__none__'
+
 /**
  * Item entry form pinned above the items list.
  * Supports quick add (name only via Enter/tap) and expanded mode
@@ -274,9 +280,15 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
           />
         )}
         <Select
-          value={category}
+          // WR-02: base-ui treats an empty-string value as "no selection" (hasSelectedValue
+          // is false when the stringified value === '', so the trigger shows the placeholder).
+          // A <SelectItem value=""> "None" therefore could never render as a distinct, checked
+          // selection and was indistinguishable from "never picked". Map the internal '' state
+          // to a non-empty sentinel for the control, and translate back to '' on change, so
+          // "None" is a real, selectable option while submit still sees '' (→ null category).
+          value={category === '' ? NONE_CATEGORY_VALUE : category}
           onValueChange={(val) => {
-            setCategory(val ?? '')
+            setCategory(val === NONE_CATEGORY_VALUE ? '' : (val ?? ''))
             // A manual pick locks the category against keystroke prefill (D-08).
             setCategoryTouched(true)
           }}
@@ -285,7 +297,7 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
             <SelectValue placeholder="Category" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="">
+            <SelectItem value={NONE_CATEGORY_VALUE}>
               None
             </SelectItem>
             {SELECTABLE_CATEGORIES.map((cat) => (

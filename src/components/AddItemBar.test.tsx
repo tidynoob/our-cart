@@ -483,8 +483,11 @@ describe('AddItemBar — auto-categorize prefill (QOL-01)', () => {
     const input = screen.getByPlaceholderText('Add an item...')
     await user.type(input, 'mil') // prefix, not an exact match
 
-    // No prefill (Select empty) and details stay collapsed.
-    expect(selectValue()).toBe('')
+    // No prefill and details stay collapsed. WR-02: the "no category" state is now mapped
+    // to the non-empty '__none__' control sentinel (base-ui treats '' as "no selection"
+    // and would render the placeholder for it), so the control value reflects '__none__'
+    // rather than '' while the underlying category remains empty (→ null on submit).
+    expect(selectValue()).toBe('__none__')
     expect(screen.getByText('More details')).toBeDefined()
   })
 
@@ -499,7 +502,8 @@ describe('AddItemBar — auto-categorize prefill (QOL-01)', () => {
 
     await user.type(screen.getByPlaceholderText('Add an item...'), 'bread')
 
-    expect(selectValue()).toBe('')
+    // WR-02: "no category" maps to the '__none__' control sentinel (see note above).
+    expect(selectValue()).toBe('__none__')
     expect(screen.getByText('More details')).toBeDefined()
   })
 
