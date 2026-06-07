@@ -185,7 +185,7 @@ Plans:
 
 **Wave 2** *(blocked on Wave 1)*
 
-- [ ] 14-04-PLAN.md — itemsStore: lastCleared/undoClear/clearLastCleared (SHOP-05) + uncheckAll (SHOP-06) + haptic-on-check-ON (QOL-03)
+- [x] 14-04-PLAN.md — itemsStore: lastCleared/undoClear/clearLastCleared (SHOP-05) + uncheckAll (SHOP-06) + haptic-on-check-ON (QOL-03)
 
 **Wave 3** *(blocked on Wave 2)*
 
@@ -225,7 +225,7 @@ Plans:
 | 11. Profiles Foundation & Hardening | v2.1 | 9/10 | In Progress|  |
 | 12. Presence | v2.1 | 2/2 | Complete   | 2026-06-01 |
 | 13. Enhanced Items | v2.1 | 8/8 | Complete   | 2026-06-06 |
-| 14. Shopping Flow & QoL | v2.1 | 3/5 | In Progress|  |
+| 14. Shopping Flow & QoL | v2.1 | 4/5 | In Progress|  |
 | 15. Keep-Alive & PWA | v2.1 | 0/TBD | Not started | - |
 
 ---

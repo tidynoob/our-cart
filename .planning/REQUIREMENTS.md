@@ -27,8 +27,8 @@ Scoped requirements for this milestone. Each maps to a roadmap phase. REQ-IDs co
 
 ### Shopping Flow
 
-- [ ] **SHOP-05**: User can undo a clear-checked action and recover the just-cleared items
-- [ ] **SHOP-06**: User can uncheck all checked items to re-shop the same list
+- [x] **SHOP-05**: User can undo a clear-checked action and recover the just-cleared items
+- [x] **SHOP-06**: User can uncheck all checked items to re-shop the same list
 - [ ] **VIEW-01**: List header shows total item count and checked count, updating live
 
 ### Quality-of-Life
@@ -101,8 +101,8 @@ Which phases cover which requirements. Populated during roadmap creation.
 | ITEM-03 | Phase 13 | Complete |
 | ITEM-04 | Phase 13 | Complete |
 | ITEM-05 | Phase 13 | Complete |
-| SHOP-05 | Phase 14 | Pending |
-| SHOP-06 | Phase 14 | Pending |
+| SHOP-05 | Phase 14 | Complete |
+| SHOP-06 | Phase 14 | Complete |
 | VIEW-01 | Phase 14 | Pending |
 | QOL-01 | Phase 14 | Complete |
 | QOL-02 | Phase 14 | Complete |
