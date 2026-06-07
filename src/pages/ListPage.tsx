@@ -363,8 +363,18 @@ export default function ListPage() {
   /** Save the new list name via store (optimistic update). */
   async function handleListRename() {
     if (!listRenameName.trim()) return
-    await renameList(list!.id, listRenameName.trim())
-    setListRenameOpen(false)
+    // WR-06: guard the async mutation. Without try/catch a network throw from renameList
+    // leaves the rename dialog stuck open (unhandled rejection). The store owns optimistic
+    // update + rollback + error state; we only need to close the dialog once it settles
+    // (success OR failure) so the UI never freezes. Mirrors the .catch(() => {}) pattern
+    // used by every other mutation handler in this file.
+    try {
+      await renameList(list!.id, listRenameName.trim())
+    } catch {
+      // Store surfaces the error; just don't leave the dialog wedged.
+    } finally {
+      setListRenameOpen(false)
+    }
   }
 
   // --- List Delete Handlers (D-08) ---
@@ -372,10 +382,18 @@ export default function ListPage() {
   /** Confirm delete: await store action then navigate away so deleted URL is unreachable. */
   async function handleListDeleteConfirm() {
     setDeleteListLoading(true)
-    // Pitfall 3: navigate only after DB confirms — store optimistic remove already happened.
-    await deleteList(list!.id)
-    setDeleteListLoading(false)
-    navigate('/')
+    // WR-06: guard the async delete. On a throw the await rejects, so without try/catch
+    // deleteListLoading is never reset and the dialog freezes on a permanent "Deleting…"
+    // button (the navigate never runs either). Navigate ONLY on success so a half-failed
+    // delete can't strand the user away from a list that still exists; on failure re-enable
+    // the controls so the user can retry or cancel. The store surfaces the error.
+    try {
+      // Pitfall 3: navigate only after DB confirms — store optimistic remove already happened.
+      await deleteList(list!.id)
+      navigate('/')
+    } catch {
+      setDeleteListLoading(false)
+    }
   }
 
   if (loading) {
