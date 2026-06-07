@@ -65,6 +65,10 @@ export const useProfilesStore = create<ProfilesState>()((set, get) => ({
             display_name: string | null
             avatar_url: string | null
           }
+          // The profiles subscription is table-wide (profiles aren't list-scoped),
+          // so it delivers UPDATEs for every user in the DB. Only patch members we
+          // already track — otherwise the map accretes a stray entry per stranger edit.
+          if (!get().profiles[updated.id]) return
           get().patch(updated.id, {
             display_name: updated.display_name,
             avatar_url: updated.avatar_url,

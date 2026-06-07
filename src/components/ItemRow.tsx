@@ -151,6 +151,10 @@ export function ItemRow({
     // Defect A gate: ignore moves that are not part of an active press. A desktop
     // mouse hover (buttons=0, no prior pointerdown) must never drag the row.
     if (!isPressed.current && !(e.buttons & 1)) return
+    // A gesture that began on an interactive child (drag handle / checkbox / stepper)
+    // must not also drive a swipe-translate: the handle owns dnd-kit reorder and a
+    // horizontal handle-drag would otherwise fight the swipe for the same pointer.
+    if (interactiveOrigin.current) return
     const delta = e.clientX - swipeStartX.current
     // WR-04: mark as moved once past the slop threshold (either direction).
     if (Math.abs(delta) > SWIPE_SLOP) swipeMoved.current = true

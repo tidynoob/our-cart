@@ -229,7 +229,7 @@ export default function ListPage() {
       window.removeEventListener('online', handleOnline)
       setListMembers(undefined)  // reset so dialog shows spinner on next list load
     }
-  }, [list, user, navigate]) // user + navigate added for member_removed handler deps
+  }, [list, user?.id, navigate]) // user?.id (not user) — token refresh mints a new user object with the same id; depending on the object tore down + rebuilt every channel hourly
 
   // --- Members Fetch ---
 

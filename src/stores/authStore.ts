@@ -57,22 +57,32 @@ export const useAuthStore = create<AuthState>()((set) => ({
         // Failure is non-critical — Postgres Changes subscription re-syncs on next update.
         if (session?.user) {
           const u = session.user
-          supabase.from('profiles').upsert(
-            {
-              id: u.id,
-              display_name:
-                u.user_metadata?.display_name ??
-                u.user_metadata?.full_name ??
-                u.user_metadata?.name ??
-                null,
-              avatar_url:
-                u.user_metadata?.avatar_url ??
-                u.user_metadata?.picture ??
-                null,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: 'id' }
-          )
+          // PostgREST builders are lazy thenables — the HTTP request only fires
+          // when .then()/await runs. A bare builder sends nothing, so this sync
+          // must terminate the chain. Stays fire-and-forget (no await, callback
+          // remains synchronous); .then() triggers execution and swallows errors.
+          void supabase
+            .from('profiles')
+            .upsert(
+              {
+                id: u.id,
+                display_name:
+                  u.user_metadata?.display_name ??
+                  u.user_metadata?.full_name ??
+                  u.user_metadata?.name ??
+                  null,
+                avatar_url:
+                  u.user_metadata?.avatar_url ??
+                  u.user_metadata?.picture ??
+                  null,
+                updated_at: new Date().toISOString(),
+              },
+              { onConflict: 'id' }
+            )
+            .then(
+              () => {},
+              () => {}
+            )
         }
       }
     )
