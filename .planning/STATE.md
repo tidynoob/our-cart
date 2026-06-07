@@ -1,16 +1,16 @@
 ---
 gsd_state_version: 1.0
-milestone: v2.0
-milestone_name: Accounts & Multi-List
-status: Awaiting next milestone
-last_updated: "2026-05-31T14:59:59.825Z"
-last_activity: 2026-05-31 — Milestone v2.0 completed and archived
+milestone: v2.1
+milestone_name: Polish, Profiles & Member Management
+status: verifying
+last_updated: "2026-06-07T18:45:50.526Z"
+last_activity: 2026-06-07
 progress:
   total_phases: 5
-  completed_phases: 5
-  total_plans: 23
-  completed_plans: 23
-  percent: 100
+  completed_phases: 3
+  total_plans: 25
+  completed_plans: 24
+  percent: 60
 ---
 
 # Project State
@@ -20,32 +20,49 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-31)
 
 **Core value:** Two people can see the same grocery list update in real-time, so nothing gets missed or double-bought.
-**Current focus:** v2.0 shipped 2026-05-31 — planning next milestone
+**Current focus:** Phase 14 — shopping-flow-qol
 
 ## Current Position
 
-Phase: Milestone v2.0 complete
-Plan: —
-Status: Awaiting next milestone
-Last activity: 2026-05-31 — Milestone v2.0 completed and archived
+Phase: 14 (shopping-flow-qol) — EXECUTING
+Plan: 5 of 5
+Status: Phase complete — ready for verification
+Last activity: 2026-06-07
+
+```
+Phase 14 Progress: [████████··] 80% (4/5 plans)
+Phase 14 Wave 0 (14-01): [x] RED gate — SC-1..SC-6 pinned
+Phase 14 Wave 1 (14-02): [x] leaf modules GREEN — haptics, checkedToBottom sort, preferencesStore
+Phase 14 Wave 2 (14-03): [x] AddItemBar QOL-01 auto-categorize GREEN (SC-4)
+Phase 14 Wave 3 (14-04): [x] itemsStore GREEN — undoClear/uncheckAll/haptic (SC-1/SC-2/SC-6 store)
+Phase 14 Wave (14-05): [ ] not started — UI wiring (UndoSnackbar, ListPage badge/uncheck-all/toggle)
+```
 
 ## Performance Metrics
 
-| Metric | v1.0 | v2.0 Target |
-|--------|------|-------------|
-| Phases | 5 | 5 |
-| Plans per phase | 3.8 avg | TBD |
-| LOC | 3,888 | TBD |
-| Phase 07 P01 | 59 | 2 tasks | 2 files |
-| Phase 07 P02 | 120 | 2 tasks | 5 files |
-| Phase 07 P03 | 300 | 1 tasks | 1 files |
-| Phase 09 P01 | 10 | 2 tasks | 4 files |
-| Phase 09 P03 | 15 minutes | 2 tasks | 3 files |
-| Phase 09 P04 | 18 | 3 tasks | 7 files |
-| Phase 10-list-sharing P00 | 5 | 2 tasks | 2 files |
-| Phase 10-list-sharing P01 | 15 | 3 tasks | 3 files |
-| Phase 10 P03 | 99 | 2 tasks | 3 files |
-| Phase 10-list-sharing P04 | 2 | 2 tasks | 3 files |
+| Metric | v1.0 | v2.0 | v2.1 Target |
+|--------|------|------|-------------|
+| Phases | 5 | 5 | 5 |
+| Plans per phase | 3.8 avg | 4.6 avg | TBD |
+| LOC | 3,888 | ~3,375 | TBD |
+| Phase 11 P02 | 100 | 2 tasks | 2 files |
+| Phase 11 P03 | 5 | 2 tasks | 2 files |
+| Phase 11-profiles-foundation-hardening P07 | 20 | 1 tasks | 1 files |
+| Phase 11-profiles-foundation-hardening P06 | 25 | 3 tasks | 7 files |
+| Phase 12 P01 (Wave 0 RED) | n/a | 2 tasks | 2 files |
+| Phase 12 P02 | 6 min | 3 tasks | 6 files |
+| Phase 13 P00 | 4min | 3 tasks | 5 files |
+| Phase 13 P01 | 8min | 3 tasks | 6 files |
+| Phase 13 P13-02 | 4min | 2 tasks | 2 files |
+| Phase 13 P13-03 | 9min | 2 tasks | 2 files |
+| Phase 13-enhanced-items P04 | 3min | 2 tasks | 4 files |
+| Phase 13 P05 | 3min | 3 tasks | 2 files |
+| Phase 13 P07 | 6min | 2 tasks | 2 files |
+| Phase 14 P01 | 18min | 3 tasks | 7 files |
+| Phase 14 P02 | ~6min | 3 tasks | 4 files |
+| Phase 14 P03 | ~12min | 1 tasks | 2 files |
+| Phase 14 P04 | ~7min | 2 tasks | 1 files |
+| Phase 14 P05 | ~4min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -61,6 +78,13 @@ Last activity: 2026-05-31 — Milestone v2.0 completed and archived
 | Nullable user_id on items | v1.0 items have no user_id; policy: `user_id IS NULL OR user_id = auth.uid()` |
 | Persistent invite tokens | No expiry for 2-person household use |
 | SECURITY DEFINER invite lookup | Avoids RLS catch-22 for unauthenticated invite token resolution |
+| No email column in public.profiles | USING (true) SELECT on profiles would expose email; column excluded by design |
+| SECURITY DEFINER for remove_member/leave_list | Direct DELETE policies risk any member removing any other; RPC enforces owner-check |
+| Broadcast member_removed on removal | RLS revoke does NOT close an open WebSocket (cached up to 1hr JWT); broadcast is the UX eject gate |
+| position TEXT via fractional-indexing | Float positions exhaust precision at ~53 halvings; string keys from fractional-indexing are lexicographically stable |
+| pendingReorders Set in Zustand | Suppresses own-update echo from Postgres Changes after reorder, preventing flicker |
+| Minimal no-cache SW for PWA | A cache-first SW breaks realtime on stale asset deploys; no fetch handler = no caching risk |
+| Daily ping to /rest/v1/profiles?limit=1 | Must touch DB to register as activity; bare /rest/v1/ root does not count |
 
 ### Watch Out For
 
@@ -71,34 +95,45 @@ Last activity: 2026-05-31 — Milestone v2.0 completed and archived
 - Use `(select auth.uid())` not bare `auth.uid()` in RLS policies (query planner caching)
 - INSERT/UPDATE RLS policies need both `USING` and `WITH CHECK`
 - `isLoading` guard required on ProtectedRoute to prevent auth state flash
+- Pre-flight check: `SELECT count(*) FROM lists WHERE owner_id IS NULL` must be 0 before HARD-01 migration
+- handle_new_user trigger requires `SECURITY DEFINER SET search_path = ''` — canonical Supabase pattern
+- All columns in profiles trigger handler must be nullable + COALESCE + ON CONFLICT DO NOTHING (blocks signup if trigger throws)
+- realtime-js archived January 2026; StrictMode ghost-channel bug will NOT be fixed upstream — use mounted ref guard in usePresence
+- Use `supabase.removeChannel()` not just `unsubscribe()` for presence cleanup (channel leak on list switch)
+- Re-call `channel.track()` on TOKEN_REFRESHED — JWT expiry drops presence tracking (~1hr)
+- Do NOT use @dnd-kit/react (v0.4.0) — experimental, TouchSensor removed, open iOS bug #1723
+- iOS has no `beforeinstallprompt` — must show manual Share > Add to Home Screen banner
+- GitHub Actions silently disabled after 60-day repo inactivity — keepalive-workflow@v2 prevents this
 
 ### Todos
 
-- Pre-code checklist: OAuth redirect URL matrix (3 environments) before Phase 6
+- [x] Two-browser UAT after Phase 11 — DONE 2026-06-01, T1-T4 all pass (gaps T1-T4 closed by 11-10)
+- SECURITY DEFINER EXECUTE grants flagged WARN by advisors (remove_member/leave_list/handle_new_user/is_list_member_for_rls) — REVOKE from anon/public deferred to `/gsd-secure-phase`
 
 ## Deferred Items
 
 | Category | Item | Status | Deferred At |
 |----------|------|--------|-------------|
-| Operational | Supabase keep-alive (OPS-01) | v2.x | Roadmap creation |
-| Operational | Presence indicator (OPS-02) | v2.x | Roadmap creation |
-| Enhanced Items | Item notes field (ITEM-01) | v2.x | Roadmap creation |
-| Enhanced Items | Manual item reorder (ITEM-02) | v2.x | Roadmap creation |
-| Member Management | Owner can remove member (MEMBER-01) | v2.x | Roadmap creation |
-| Member Management | Member can leave list (MEMBER-02) | v2.x | Roadmap creation |
 | Doc status | Phase 07 UAT (07-HUMAN-UAT.md) — `partial`, 1 scenario blocked_by prior-phase (now unblocked by Phase 10) | doc-debt | v2.0 close |
 | Doc status | Phase 08 verification (08-VERIFICATION.md) — `human_needed`, browser-only visual checks, code verified | doc-debt | v2.0 close |
 | Doc status | Phase 09 verification (09-VERIFICATION.md) — `human_needed`, code verified | doc-debt | v2.0 close |
 | Doc status | Phase 09 UAT (09-HUMAN-UAT.md) — `testing`, 6 browser scenarios | doc-debt | v2.0 close |
 
-Doc-status items acknowledged at milestone close: UAT/verification docs left un-flipped. Equivalent browser behaviors exercised live during Phase 10 two-account UAT (sign-in, sidebar, avatar, sharing all worked across two real Gmail accounts). No functional gaps — `tsc --noEmit` clean, 166 unit tests green (22 files), prod build green.
+Doc-status items acknowledged at milestone close: UAT/verification docs left un-flipped. Equivalent browser behaviors exercised live during Phase 10 two-account UAT. No functional gaps — `tsc --noEmit` clean, 166 unit tests green (22 files), prod build green.
+
+## Quick Tasks Completed
+
+| # | Description | Date | Commit | Directory |
+|---|-------------|------|--------|-----------|
+| 260607-hok | port code-review fixes to PR #1 branch | 2026-06-07 | bae1347 | [260607-hok-port-code-review-fixes-to-pr-1-branch](./quick/260607-hok-port-code-review-fixes-to-pr-1-branch/) |
 
 ## Session Continuity
 
-Last session: 2026-05-31 -- v2.0 milestone close
-Stopped at: Milestone v2.0 archived, tagged, committed
+Last session: 2026-06-07T18:45:19.884Z
+Stopped at: Completed 14-04-PLAN.md (SHOP-05/SHOP-06/QOL-03 store GREEN)
 Resume file: None
-Next action: `/gsd-new-milestone`
+Next action: Execute Phase 14 (Shopping Flow & QoL) — /gsd-execute-phase 14
+Note: origin/main is code-only (squash PRs). Local main retains full .planning history and is AHEAD of origin/main — do NOT push local main; publish future code via gsd-pr-branch cut from origin/main.
 
 ## Decisions
 
@@ -112,7 +147,39 @@ Next action: `/gsd-new-milestone`
 - [Phase ?]: D-04: redeem_invite inserts auth.uid() only, never caller-supplied user_id, with ON CONFLICT DO NOTHING idempotency
 - [Phase ?]: D-05: ShareBanner uses /invite/:code URL so partners receive redemption flow not blocked ListPage
 - [Phase ?]: D-08: fetchLists drops owner_id filter; RLS membership policy gates rows; userId param kept as _userId for API compatibility
+- [Phase ?]: Reactive useProfilesStore selector in ItemRow (not getState snapshot) for PROF-05 live names
+- [Phase 11 gap]: is_list_member_for_rls SECURITY DEFINER helper (explicit user_id arg) broadens list_members_select so any member reads all co-member rows — fixes cross-user avatar + Members-dialog spinner without RLS recursion
+- [Phase 11 gap]: public.profiles added to supabase_realtime publication for live name/avatar UPDATEs; client must re-subscribe (reload) after a publication change to receive events
+- [Phase 11 gap]: display_name has no visible surface for an avatar'd member (badge shows img; name only feeds initials fallback + aria-label) — live PROF-05 only observable when avatar absent
+- [Phase 12 W0]: OPS-02 presence contract pinned as failing tests before implementation (Nyquist gate) — presenceStore.test.ts + PresenceIndicator.test.tsx committed RED. Wave 1 (12-02) builds presenceStore.ts + PresenceIndicator.tsx to GREEN.
+- [Phase 12 W0]: PresenceIndicator must neutralize AttributionBadge's hardcoded inner `aria-label="{name} added this"` so the wrapper `"{name} is viewing this list"` is the SINGLE accessible name (W-2 correctness pin; do not edit AttributionBadge).
+- [Phase ?]: [Phase 12 W1]: OPS-02 presence shipped via presence-listId channel keyed by user.id; deriveOthers self-filter + tab-dedupe; retrack on TOKEN_REFRESHED through single auth listener; aria-label neutralized by ref (no AttributionBadge fork)
+- [Phase ?]: [Phase 13 W0]: ITEM-01..05 contracts pinned as failing RED tests before implementation (Nyquist gate); Wave 1/2 build to GREEN.
+- [Phase ?]: [Phase 13 W0]: ItemRow swipe container must expose [data-swipe-row]; stepper aria-labels Increase/Decrease quantity; useSortable mocked no-op for jsdom drag.
+- [Phase 13 W1]: enhanced_items.sql applied to LIVE DB via Supabase MCP apply_migration (Phase 11-08 pattern) — note/position columns present, 0 null positions, items confirmed in supabase_realtime (A1). Append-only, no RLS change (D-02), no publication re-add.
+- [Phase 13 W1]: position backfill via plpgsql DO loop with padded keys 'a'||lpad(i,4,'0') in created_at order — lexicographic == numeric to 9999 rows, sorts before future generateKeyBetween appends (A3).
+- [Phase 13 W1]: ordering.ts pure helpers (computeReorderKey/parseQuantity/byPosition); position sort is a SINGLE chokepoint inside groupItemsByCategory (CategorySection/ListPage stay sort-free); null positions fall back to created_at.
+- [Phase 13 W1]: Item type extension forced note:null,position:null into addItem optimistic literal (tsc restore); real insert-key generateKeyBetween(currentMax,null) deferred to Plan 02. reorderItem RED tests stay red by design (Plan 02 scope).
+- [Phase ?]: [Phase 13 W2]: itemsStore.reorderItem = single optimistic {category, position} write (D-09 cross-category adopt) + per-item rollback; pendingReorders one-shot UPDATE echo-skip (D-10) mirrors pendingTempIds; updateItem Pick widened note|position (D-03); addItem appends computeReorderKey(currentMax,null) so new rows never null-position (D-11). itemsStore 29/29 GREEN, tsc clean.
+- [Phase ?]: 13-03: ItemRow stepper wired to existing onSave (not onStep) per Wave-0 contract; note as escaped JSX text (no raw-HTML, T-13-V5a); handle-only useSortable + hand-rolled swipe-to-delete (clamp -96, threshold -64)
+- [Phase ?]: [Phase 13 W4]: ListPage mounts single list-wide DndContext (PointerSensor distance:8 + KeyboardSensor) + one SortableContext over flat item ids; handleDragEnd -> reorderItem (cross-category MOVE in onDragEnd, D-09); handleStep -> updateItem({quantity}) via CategorySection onStep
+- [Phase ?]: [Phase 13 W4]: cross-category drop-target header hover left STATIC -- single-context model has no per-section over-state; cross-category MOVE still works via onDragEnd compute (visual-only, per plan allowance)
+- [Phase ?]: [Phase 13 W4]: AddItemBar dupExists = unchecked-only case-insensitive match against live store items (D-14); role=status amber warning, escaped JSX (T-13-V5); Add stays enabled, handleSubmit ungated (D-15)
+- [Phase 13 13-05]: ItemRow swipe press-gated via isPressed ref + (e.buttons&1) early-return; pointercancel/pointerleave snaps a stray SUB-THRESHOLD offset back to 0 but leaves a committed reveal intact; setPointerCapture kept but the gate (not capture) decides if a move counts (Defect A).
+- [Phase 13 13-05]: revealed Delete wrapper z-10 + foreground pointer-events-none when revealed, pointer-events-auto on drag handle/checkbox/stepper — structural fix so the translated opaque foreground no longer steals the Delete click (Defect B). Gap-1 check-off resolved via checkbox; row-tap KEEPS open-edit (Warning 4). jsdom tests anchor the mechanism; on-device 13-HUMAN-UAT tests 2 & 3 are the final gate.
+- [Phase ?]: [Phase 13 13-07]: AddItemBar clears input synchronously BEFORE await addItem (quantity/category captured into locals first) so the optimistic insert never coincides with a populated name; closes UAT gap 6 dup-warning flash. dupExists/warning render unchanged, D-14/D-15 preserved. Regression test uses deferred-addItem observable-flash form (React 19 batching defers the DOM input clear).
+- [Phase 13 13-06]: ItemRow capture-on-swipe-only — setPointerCapture moved OUT of pointerdown INTO pointermove behind slop+delta<0 guard (single capture/gesture via pointerCaptured ref); root-cause fix for UAT gaps 2+4 (a plain tap stays uncaptured → checkbox/stepper get native activation; no separate stepper hack). handleRowTap guarded by interactiveOrigin ref (data-row-interactive closest() match on pointerdown e.target) as belt-and-suspenders. Gap 7: dxAtStart baseline unifies left/right swipe so delta>0 from revealed reduces |dx| and clears revealed crossing above -64; sibling z-0 pointer-events-auto tap-catcher restores tap-dismiss while foreground stays pointer-events-none (13-05 Defect-B Test D mechanism preserved). 27/27 ItemRow + 269/269 full suite green, tsc clean. On-device UAT tests 2/4/7 are the FINAL gate.
+- [Phase ?]: [Phase 14 W0]: SC-1..SC-6 pinned as failing RED tests before implementation (Nyquist gate); Waves 1-3 (14-02..14-04) build to GREEN. 7 files: 3 new (preferencesStore/haptics/UndoSnackbar) + 4 extended (itemsStore/categories/AddItemBar/ListPage).
+- [Phase ?]: [Phase 14 W0]: A1 verdict — items.id ACCEPTS client-supplied UUID on INSERT -> 14-04 undoClear uses .insert(buffered). Basis: read-only static (items_insert RLS gates by list_id only, never id; explicit value overrides gen_random_uuid default). No live probe row (T-14-01 mitigated).
+- [Phase ?]: [Phase 14 W0]: Supabase insert mock now array-thenable (insert(array) resolves {data,error} for undoClear) while .select().single() still works (addItem). uncheckAll must NOT route through pendingReorders (Pitfall 3).
+- [Phase 14 W1]: 14-02: triggerHaptic (feature-detect + try/catch, T-14-V3); groupItemsByCategory checkedToBottom composed comparator (unchecked-first then byPosition, per-section sink, pure lib no store import, D-09); first persisted preferencesStore (persist + createJSONStorage 'our-cart-prefs', safeLocalStorage probe+in-memory fallback T-14-V2, merge boolean-coerce T-14-V1, partialize data-only). SC-5/SC-6 lib GREEN, zero new deps.
+- [Phase 14 W1]: 14-02 [Rule 3]: Node 26 ships an experimental getter-only `localStorage` global (undefined without --localstorage-file) that shadows jsdom's window.localStorage, leaving bare `localStorage` undefined in every vitest test. Fixed at env level — in-memory MemoryStorage shim defineProperty'd onto globalThis in test-setup.ts (plain assign no-ops vs the getter); frozen 14-01 RED contracts untouched.
+- [Phase ?]: [Phase 14 W2] 14-03: QOL-01 auto-categorize wired into AddItemBar reusing distinctItems (exact case-insensitive match -> silent category prefill + expand, UI-SPEC §4); categoryTouched guard blocks keystroke clobber of a manual/picked category, resets on submit ONLY (not on in-session clear, per frozen 14-01 no-clobber RED); Select always-mounted (hidden when collapsed) for value observability. Zero new deps, no table/migration.
+- [Phase 14]: 14-04: itemsStore undoClear uses .insert(buffered) per A1 verdict (id-preserving re-add, dedup-by-id, rollback on insert failure); clearChecked promotes pre-delete snapshot into lastCleared (D-01), buffer cleared on list-switch/unsubscribe (Pitfall 2). uncheckAll = single .update({checked:false}).eq(list_id).eq(checked,true) optimistic flip-all + bulk rollback, NOT via pendingReorders (Pitfall 3). toggleChecked fires triggerHaptic only on check-ON (D-12). [Rule 3] extended update().eq() mock to double-eq. SC-1/SC-2/SC-6 store GREEN, 45/45 itemsStore, tsc clean, zero new deps.
+- [Phase ?]: [Phase 14 W3] 14-05: ListPage UI wiring GREEN — UndoSnackbar (role=status, leak-safe 5s setTimeout keyed on [lastCleared,clearLastCleared], neutral muted surface, accent Undo, no countdown bar, mounted inline at list bottom, SHOP-05); VIEW-01 live count badge under h1 in a min-w-0 column (gated total>0, D-06); SHOP-06 uncheck-all button + Clear-dialog clone (disablePointerDismissal, D-05); QOL-02 ArrowDownToLine header icon Button (aria-pressed + aria-label flip, NOT shadcn Switch D-11) -> groupItemsByCategory(items, checkedToBottom); header gap-2->gap-1 for 360px density. [Rule 3] import type Item in itemsStore.test.ts (14-04 latent tsc -b break). 314/314 suite, tsc clean, build green, zero new deps.
 
 ## Operator Next Steps
 
-- Start the next milestone with /gsd-new-milestone
+- [x] PR #1 MERGED 2026-06-07 (squash 5f4e1cd) — v2.1 phases 11–13 + code-review fixes; branch deleted; local main reconciled (-s ours)
+- Next: /gsd-discuss-phase 14 (Shopping Flow & QoL) — first unplanned phase
+- Doc-debt (non-blocking): write 11-09-SUMMARY.md; flip 11-HUMAN-UAT.md status diagnosed→complete
