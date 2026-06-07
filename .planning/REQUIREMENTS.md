@@ -33,7 +33,7 @@ Scoped requirements for this milestone. Each maps to a roadmap phase. REQ-IDs co
 
 ### Quality-of-Life
 
-- [ ] **QOL-01**: When adding an item, its category is auto-suggested from the item name (overridable)
+- [x] **QOL-01**: When adding an item, its category is auto-suggested from the item name (overridable)
 - [x] **QOL-02**: User can toggle checked items to sink to the bottom of the list (preference persists)
 - [x] **QOL-03**: Checking off an item triggers haptic feedback on supporting mobile devices
 
@@ -104,7 +104,7 @@ Which phases cover which requirements. Populated during roadmap creation.
 | SHOP-05 | Phase 14 | Pending |
 | SHOP-06 | Phase 14 | Pending |
 | VIEW-01 | Phase 14 | Pending |
-| QOL-01 | Phase 14 | Pending |
+| QOL-01 | Phase 14 | Complete |
 | QOL-02 | Phase 14 | Complete |
 | QOL-03 | Phase 14 | Complete |
 | OPS-01 | Phase 15 | Pending |

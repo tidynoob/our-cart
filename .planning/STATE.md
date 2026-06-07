@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish, Profiles & Member Management
 status: executing
-last_updated: "2026-06-07T18:21:01.678Z"
+last_updated: "2026-06-07T18:28:31.671Z"
 last_activity: 2026-06-07
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 25
-  completed_plans: 21
-  percent: 40
+  completed_plans: 22
+  percent: 88
 ---
 
 # Project State
@@ -25,15 +25,16 @@ See: .planning/PROJECT.md (updated 2026-05-31)
 ## Current Position
 
 Phase: 14 (shopping-flow-qol) — EXECUTING
-Plan: 3 of 5
-Status: Executing Phase 14 — Plan 14-02 (Wave 1 leaf modules) complete; ready for 14-03
-Last activity: 2026-06-07 -- 14-02 GREEN: haptics + categories.checkedToBottom + persisted preferencesStore (SC-5/SC-6 lib), zero new deps
+Plan: 4 of 5
+Status: Executing Phase 14 — Plan 14-03 (QOL-01 auto-categorize) complete; ready for 14-04
+Last activity: 2026-06-07 -- 14-03 GREEN: AddItemBar auto-categorize prefill (QOL-01/SC-4), categoryTouched guard, zero new deps
 
 ```
-Phase 14 Progress: [████······] 40% (2/5 plans)
+Phase 14 Progress: [██████····] 60% (3/5 plans)
 Phase 14 Wave 0 (14-01): [x] RED gate — SC-1..SC-6 pinned
 Phase 14 Wave 1 (14-02): [x] leaf modules GREEN — haptics, checkedToBottom sort, preferencesStore
-Phase 14 Wave 2-3 (14-03..14-04): [ ] build to GREEN
+Phase 14 Wave 2 (14-03): [x] AddItemBar QOL-01 auto-categorize GREEN (SC-4)
+Phase 14 Wave 3 (14-04): [ ] build to GREEN (undoClear/uncheckAll/badge/toggle UI)
 Phase 14 Wave (14-05): [ ] not started
 ```
 
@@ -59,6 +60,7 @@ Phase 14 Wave (14-05): [ ] not started
 | Phase 13 P07 | 6min | 2 tasks | 2 files |
 | Phase 14 P01 | 18min | 3 tasks | 7 files |
 | Phase 14 P02 | ~6min | 3 tasks | 4 files |
+| Phase 14 P03 | ~12min | 1 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -125,8 +127,8 @@ Doc-status items acknowledged at milestone close: UAT/verification docs left un-
 
 ## Session Continuity
 
-Last session: 2026-06-07T18:20:38.299Z
-Stopped at: Phase 14 plan complete (5 plans, 4 waves); session resumed -> proceeding to execute
+Last session: 2026-06-07T18:28:31.662Z
+Stopped at: Completed 14-03-PLAN.md (QOL-01 auto-categorize GREEN)
 Resume file: None
 Next action: Execute Phase 14 (Shopping Flow & QoL) — /gsd-execute-phase 14
 Note: origin/main is code-only (squash PRs). Local main retains full .planning history and is AHEAD of origin/main — do NOT push local main; publish future code via gsd-pr-branch cut from origin/main.
@@ -170,6 +172,7 @@ Note: origin/main is code-only (squash PRs). Local main retains full .planning h
 - [Phase ?]: [Phase 14 W0]: Supabase insert mock now array-thenable (insert(array) resolves {data,error} for undoClear) while .select().single() still works (addItem). uncheckAll must NOT route through pendingReorders (Pitfall 3).
 - [Phase 14 W1]: 14-02: triggerHaptic (feature-detect + try/catch, T-14-V3); groupItemsByCategory checkedToBottom composed comparator (unchecked-first then byPosition, per-section sink, pure lib no store import, D-09); first persisted preferencesStore (persist + createJSONStorage 'our-cart-prefs', safeLocalStorage probe+in-memory fallback T-14-V2, merge boolean-coerce T-14-V1, partialize data-only). SC-5/SC-6 lib GREEN, zero new deps.
 - [Phase 14 W1]: 14-02 [Rule 3]: Node 26 ships an experimental getter-only `localStorage` global (undefined without --localstorage-file) that shadows jsdom's window.localStorage, leaving bare `localStorage` undefined in every vitest test. Fixed at env level — in-memory MemoryStorage shim defineProperty'd onto globalThis in test-setup.ts (plain assign no-ops vs the getter); frozen 14-01 RED contracts untouched.
+- [Phase ?]: [Phase 14 W2] 14-03: QOL-01 auto-categorize wired into AddItemBar reusing distinctItems (exact case-insensitive match -> silent category prefill + expand, UI-SPEC §4); categoryTouched guard blocks keystroke clobber of a manual/picked category, resets on submit ONLY (not on in-session clear, per frozen 14-01 no-clobber RED); Select always-mounted (hidden when collapsed) for value observability. Zero new deps, no table/migration.
 
 ## Operator Next Steps
 
