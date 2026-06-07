@@ -3,13 +3,13 @@ gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish, Profiles & Member Management
 status: executing
-last_updated: "2026-06-07T17:26:06.541Z"
-last_activity: 2026-06-07 -- Phase 14 planning complete
+last_updated: "2026-06-07T18:11:35.474Z"
+last_activity: 2026-06-07
 progress:
   total_phases: 5
   completed_phases: 2
   total_plans: 25
-  completed_plans: 19
+  completed_plans: 20
   percent: 40
 ---
 
@@ -20,22 +20,20 @@ progress:
 See: .planning/PROJECT.md (updated 2026-05-31)
 
 **Core value:** Two people can see the same grocery list update in real-time, so nothing gets missed or double-bought.
-**Current focus:** Phase 13 — enhanced-items
+**Current focus:** Phase 14 — shopping-flow-qol
 
 ## Current Position
 
-Phase: 13 (enhanced-items) — COMPLETE (UAT 8/8 passed, security 9/9 closed)
-Plan: 13-07 complete (all 8 plans done)
-Status: Ready to execute
-Last activity: 2026-06-07 -- Phase 14 planning complete
+Phase: 14 (shopping-flow-qol) — EXECUTING
+Plan: 2 of 5
+Status: Executing Phase 14 — Plan 14-01 (Wave 0 RED gate) complete; ready for 14-02
+Last activity: 2026-06-07 -- 14-01 Wave 0 Nyquist RED gate complete (7 test files RED, A1 verdict recorded)
 
 ```
-v2.1 Progress: [██········] 20% (1/5 phases)
-Phase 11: [x] Complete
-Phase 12: [ ] Not started
-Phase 13: [ ] Not started
-Phase 14: [ ] Not started
-Phase 15: [ ] Not started
+Phase 14 Progress: [██········] 20% (1/5 plans)
+Phase 14 Wave 0 (14-01): [x] RED gate — SC-1..SC-6 pinned
+Phase 14 Wave 1-3 (14-02..14-04): [ ] build to GREEN
+Phase 14 Wave (14-05): [ ] not started
 ```
 
 ## Performance Metrics
@@ -58,6 +56,7 @@ Phase 15: [ ] Not started
 | Phase 13-enhanced-items P04 | 3min | 2 tasks | 4 files |
 | Phase 13 P05 | 3min | 3 tasks | 2 files |
 | Phase 13 P07 | 6min | 2 tasks | 2 files |
+| Phase 14 P01 | 18min | 3 tasks | 7 files |
 
 ## Accumulated Context
 
@@ -124,10 +123,10 @@ Doc-status items acknowledged at milestone close: UAT/verification docs left un-
 
 ## Session Continuity
 
-Last session: 2026-06-07T17:11:17.121Z
-Stopped at: Phase 14 UI-SPEC approved
-Resume file: .planning/phases/14-shopping-flow-qol/14-UI-SPEC.md
-Next action: Plan Phase 14 (Shopping Flow & QoL) — /gsd-discuss-phase 14
+Last session: 2026-06-07T18:11:03.744Z
+Stopped at: Phase 14 plan complete (5 plans, 4 waves); session resumed -> proceeding to execute
+Resume file: None
+Next action: Execute Phase 14 (Shopping Flow & QoL) — /gsd-execute-phase 14
 Note: origin/main is code-only (squash PRs). Local main retains full .planning history and is AHEAD of origin/main — do NOT push local main; publish future code via gsd-pr-branch cut from origin/main.
 
 ## Decisions
@@ -164,6 +163,9 @@ Note: origin/main is code-only (squash PRs). Local main retains full .planning h
 - [Phase 13 13-05]: revealed Delete wrapper z-10 + foreground pointer-events-none when revealed, pointer-events-auto on drag handle/checkbox/stepper — structural fix so the translated opaque foreground no longer steals the Delete click (Defect B). Gap-1 check-off resolved via checkbox; row-tap KEEPS open-edit (Warning 4). jsdom tests anchor the mechanism; on-device 13-HUMAN-UAT tests 2 & 3 are the final gate.
 - [Phase ?]: [Phase 13 13-07]: AddItemBar clears input synchronously BEFORE await addItem (quantity/category captured into locals first) so the optimistic insert never coincides with a populated name; closes UAT gap 6 dup-warning flash. dupExists/warning render unchanged, D-14/D-15 preserved. Regression test uses deferred-addItem observable-flash form (React 19 batching defers the DOM input clear).
 - [Phase 13 13-06]: ItemRow capture-on-swipe-only — setPointerCapture moved OUT of pointerdown INTO pointermove behind slop+delta<0 guard (single capture/gesture via pointerCaptured ref); root-cause fix for UAT gaps 2+4 (a plain tap stays uncaptured → checkbox/stepper get native activation; no separate stepper hack). handleRowTap guarded by interactiveOrigin ref (data-row-interactive closest() match on pointerdown e.target) as belt-and-suspenders. Gap 7: dxAtStart baseline unifies left/right swipe so delta>0 from revealed reduces |dx| and clears revealed crossing above -64; sibling z-0 pointer-events-auto tap-catcher restores tap-dismiss while foreground stays pointer-events-none (13-05 Defect-B Test D mechanism preserved). 27/27 ItemRow + 269/269 full suite green, tsc clean. On-device UAT tests 2/4/7 are the FINAL gate.
+- [Phase ?]: [Phase 14 W0]: SC-1..SC-6 pinned as failing RED tests before implementation (Nyquist gate); Waves 1-3 (14-02..14-04) build to GREEN. 7 files: 3 new (preferencesStore/haptics/UndoSnackbar) + 4 extended (itemsStore/categories/AddItemBar/ListPage).
+- [Phase ?]: [Phase 14 W0]: A1 verdict — items.id ACCEPTS client-supplied UUID on INSERT -> 14-04 undoClear uses .insert(buffered). Basis: read-only static (items_insert RLS gates by list_id only, never id; explicit value overrides gen_random_uuid default). No live probe row (T-14-01 mitigated).
+- [Phase ?]: [Phase 14 W0]: Supabase insert mock now array-thenable (insert(array) resolves {data,error} for undoClear) while .select().single() still works (addItem). uncheckAll must NOT route through pendingReorders (Pitfall 3).
 
 ## Operator Next Steps
 

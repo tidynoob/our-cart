@@ -176,7 +176,7 @@ Plans:
 
 **Wave 0**
 
-- [ ] 14-01-PLAN.md — Wave 0 RED-test gate: 3 new test files (preferencesStore, haptics, UndoSnackbar) + 4 extensions + Supabase array-insert mock + A1 probe (pins SC-1..SC-6)
+- [x] 14-01-PLAN.md — Wave 0 RED-test gate: 3 new test files (preferencesStore, haptics, UndoSnackbar) + 4 extensions + Supabase array-insert mock + A1 probe (pins SC-1..SC-6)
 
 **Wave 1** *(blocked on Wave 0)*
 
@@ -225,7 +225,7 @@ Plans:
 | 11. Profiles Foundation & Hardening | v2.1 | 9/10 | In Progress|  |
 | 12. Presence | v2.1 | 2/2 | Complete   | 2026-06-01 |
 | 13. Enhanced Items | v2.1 | 8/8 | Complete   | 2026-06-06 |
-| 14. Shopping Flow & QoL | v2.1 | 0/5 | Not started | - |
+| 14. Shopping Flow & QoL | v2.1 | 1/5 | In Progress|  |
 | 15. Keep-Alive & PWA | v2.1 | 0/TBD | Not started | - |
 
 ---
