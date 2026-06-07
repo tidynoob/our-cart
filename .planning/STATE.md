@@ -2,15 +2,15 @@
 gsd_state_version: 1.0
 milestone: v2.1
 milestone_name: Polish, Profiles & Member Management
-status: executing
-last_updated: "2026-06-06T12:36:37.008Z"
-last_activity: 2026-06-06
+status: "v2.1 phases 11–13 shipped — PR #1 (code-only branch gsd/v2.1-polish-profiles → main)"
+last_updated: "2026-06-07T16:57:54.843Z"
+last_activity: "2026-06-07 - Completed quick task 260607-hok: port code-review fixes to PR #1 branch"
 progress:
   total_phases: 5
-  completed_phases: 1
+  completed_phases: 2
   total_plans: 20
-  completed_plans: 18
-  percent: 20
+  completed_plans: 19
+  percent: 40
 ---
 
 # Project State
@@ -124,9 +124,9 @@ Doc-status items acknowledged at milestone close: UAT/verification docs left un-
 
 ## Session Continuity
 
-Last session: 2026-06-07
-Stopped at: PR #1 MERGED (squash 5f4e1cd) → origin/main; remote branch deleted. Local main reconciled via -s ours merge (origin integrated, descendant). Code-review fixes (quick 260607-hok) included.
-Resume file: None
+Last session: 2026-06-07T16:57:54.827Z
+Stopped at: Phase 14 context gathered
+Resume file: .planning/phases/14-shopping-flow-qol/14-CONTEXT.md
 Next action: Plan Phase 14 (Shopping Flow & QoL) — /gsd-discuss-phase 14
 Note: origin/main is code-only (squash PRs). Local main retains full .planning history and is AHEAD of origin/main — do NOT push local main; publish future code via gsd-pr-branch cut from origin/main.
 
