@@ -531,12 +531,14 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
                 if (inFlightListId === listId) inFlightListId = null
               })
               .catch(() => {
-                // WR-01 fix: On failure, clear guard immediately so any subsequent
-                // SUBSCRIBED callback can trigger a fresh fetch. Without this, a
-                // SUBSCRIBED callback that fired (and was skipped) while this fetch
-                // was in-flight would leave the user with stale/missing items and
-                // no automatic recovery path.
-                inFlightListId = null
+                // WR-04: clear the guard ONLY if it still belongs to THIS list. A rapid
+                // list switch (A → B) may have already set inFlightListId='B' with B's fetch
+                // legitimately in flight; an unconditional reset here would clear B's guard
+                // and permit a redundant concurrent fetch for B. Mirroring the .then's
+                // conditional keeps the dedup guarantee airtight across rapid switches.
+                // (When the guard does still equal this listId, clearing it on failure lets
+                // a subsequent SUBSCRIBED callback trigger a fresh recovery fetch.)
+                if (inFlightListId === listId) inFlightListId = null
               })
           }
         } else {
