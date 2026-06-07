@@ -289,6 +289,11 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
 
     const nextChecked = !prev.checked
 
+    // QOL-03 / D-12: fire a single haptic pulse on the check-ON transition only.
+    // The user's tap satisfies sticky user activation; fire here (not from the realtime
+    // echo branch) so the partner's check-off never buzzes this device.
+    if (nextChecked) triggerHaptic()
+
     // Optimistic update: flip checked on matching item
     set((state) => ({
       items: state.items.map((i) =>
@@ -348,6 +353,42 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
           syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
         }
       })
+    }
+  },
+
+  uncheckAll: async (listId) => {
+    // SHOP-06 / D-04: bulk "re-shop" — flip every checked item back to unchecked in a
+    // single filtered update. Mirrors clearChecked's snapshot-before-set + bulk rollback.
+    // Snapshot BEFORE optimistic set (Pitfall 4 — read before set()).
+    const checkedItems = get().items.filter((i) => i.checked)
+    if (checkedItems.length === 0) return
+
+    // Optimistic flip: every checked item -> checked:false immediately.
+    set((state) => ({
+      items: state.items.map((i) => (i.checked ? { ...i, checked: false } : i)),
+      error: null,
+    }))
+
+    // ONE filtered server-side update scoped to this list's checked rows. Do NOT route
+    // these ids through pendingReorders — that one-shot guard is reorder-specific and would
+    // drop the first UPDATE echo (Pitfall 3); the UPDATE branch is already idempotent.
+    const { error } = await supabase
+      .from('items')
+      .update({ checked: false })
+      .eq('list_id', listId)
+      .eq('checked', true)
+
+    if (error) {
+      // Bulk rollback: restore checked:true on exactly the snapshotted ids (do not touch
+      // rows that were already unchecked). SYNC-03: offline -> syncStatus 'reconnecting'.
+      const snapshotIds = new Set(checkedItems.map((i) => i.id))
+      set((state) => ({
+        items: state.items.map((i) =>
+          snapshotIds.has(i.id) ? { ...i, checked: true } : i
+        ),
+        error: 'Failed to uncheck items',
+        syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
+      }))
     }
   },
 
