@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+import React from 'react'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { AddItemBar } from './AddItemBar'
@@ -68,11 +69,17 @@ vi.mock('lucide-react', async () => {
   }
 })
 
-// Mock @base-ui/react/select to render real DOM with className passthrough
+// Mock @base-ui/react/select to render real DOM with className passthrough.
+// The Root exposes the controlled `value` (as a DOM attribute, so prefill is
+// observable) and shares its onValueChange with Items via React context so a
+// click on an Item simulates a manual category pick (QOL-01 no-clobber test).
+const SelectValueChangeContext = React.createContext<((v: string) => void) | undefined>(undefined)
 vi.mock('@base-ui/react/select', () => ({
   Select: {
-    Root: ({ children, ...props }: { children: React.ReactNode; [key: string]: unknown }) => (
-      <div data-slot="select-root" {...props}>{children}</div>
+    Root: ({ children, value, onValueChange, ...props }: { children: React.ReactNode; value?: string; onValueChange?: (v: string) => void; [key: string]: unknown }) => (
+      <SelectValueChangeContext.Provider value={onValueChange}>
+        <div data-slot="select-root" data-value={value ?? ''} {...props}>{children}</div>
+      </SelectValueChangeContext.Provider>
     ),
     Trigger: ({ children, className, ...props }: { children: React.ReactNode; className?: string; [key: string]: unknown }) => (
       <button data-slot="select-trigger" className={className} {...props}>{children}</button>
@@ -85,9 +92,12 @@ vi.mock('@base-ui/react/select', () => ({
     Positioner: ({ children }: { children: React.ReactNode; [key: string]: unknown }) => <div>{children}</div>,
     Popup: ({ children }: { children: React.ReactNode; [key: string]: unknown }) => <div>{children}</div>,
     List: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Item: ({ children, value }: { children: React.ReactNode; value: string; [key: string]: unknown }) => (
-      <div data-slot="select-item" data-value={value}>{children}</div>
-    ),
+    Item: ({ children, value }: { children: React.ReactNode; value: string; [key: string]: unknown }) => {
+      const onValueChange = React.useContext(SelectValueChangeContext)
+      return (
+        <div data-slot="select-item" data-value={value} onClick={() => onValueChange?.(value)}>{children}</div>
+      )
+    },
     ItemText: ({ children }: { children: React.ReactNode; [key: string]: unknown }) => <span>{children}</span>,
     ItemIndicator: () => null,
     Separator: () => <hr />,
@@ -410,6 +420,146 @@ describe('AddItemBar — duplicate warning (ITEM-04)', () => {
     resolveAddItem()
     await waitFor(() => {
       expect(screen.queryByRole('status')).toBeNull()
+    })
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// RED (Wave 0, QOL-01 / D-08): auto-categorize prefill. AddItemBar does not
+// prefill the category from name history yet — these fail until handleNameChange
+// gains the exact-match prefill + categoryTouched guard (Wave 1). Contract:
+//   (a) typing a name that EXACTLY matches (case-insensitive) a distinctItems entry
+//       with a non-null category prefills the Select AND expands the details row
+//   (b) a non-matching / partial name does NOT prefill
+//   (c) after a manual pick (Select onValueChange), a later keystroke does NOT
+//       clobber the manual choice (categoryTouched)
+//   (d) the flag resets on submit
+//
+// Observability: the mocked Select Root exposes the controlled value as
+// data-value on [data-slot="select-root"]; expansion shows the "Less details" label.
+// ──────────────────────────────────────────────────────────────────────────
+describe('AddItemBar — auto-categorize prefill (QOL-01)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockSuggestionData = []
+    mockStoreItems = []
+  })
+
+  function selectValue(): string | null {
+    return document.querySelector('[data-slot="select-root"]')?.getAttribute('data-value') ?? null
+  }
+
+  it('prefills the category Select and expands details on an exact case-insensitive name match', async () => {
+    mockSuggestionData = [{ name: 'Milk', category: 'Dairy', quantity: '2' }]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    // Wait for the mount fetch to populate distinctItems.
+    await waitFor(() => {
+      expect(true).toBe(true)
+    })
+
+    const input = screen.getByPlaceholderText('Add an item...')
+    // Different case than the stored 'Milk' — exact match is case-insensitive.
+    await user.type(input, 'milk')
+
+    // Details row auto-expanded (so the prefilled category is visible) and the
+    // Select carries the prefilled category.
+    await waitFor(() => {
+      expect(screen.getByText('Less details')).toBeDefined()
+    })
+    expect(selectValue()).toBe('Dairy')
+  })
+
+  it('does NOT prefill for a partial (prefix-only) name match', async () => {
+    mockSuggestionData = [{ name: 'Milk', category: 'Dairy', quantity: '2' }]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    await waitFor(() => {
+      expect(true).toBe(true)
+    })
+
+    const input = screen.getByPlaceholderText('Add an item...')
+    await user.type(input, 'mil') // prefix, not an exact match
+
+    // No prefill (Select empty) and details stay collapsed.
+    expect(selectValue()).toBe('')
+    expect(screen.getByText('More details')).toBeDefined()
+  })
+
+  it('does NOT prefill when the matched history entry has a null category', async () => {
+    mockSuggestionData = [{ name: 'Bread', category: null, quantity: null }]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    await waitFor(() => {
+      expect(true).toBe(true)
+    })
+
+    await user.type(screen.getByPlaceholderText('Add an item...'), 'bread')
+
+    expect(selectValue()).toBe('')
+    expect(screen.getByText('More details')).toBeDefined()
+  })
+
+  it('does NOT clobber a manual category pick on a later keystroke (categoryTouched)', async () => {
+    mockSuggestionData = [
+      { name: 'Milk', category: 'Dairy', quantity: '2' },
+      { name: 'Milkshake', category: 'Beverages', quantity: '1' },
+    ]
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    await waitFor(() => {
+      expect(true).toBe(true)
+    })
+
+    const input = screen.getByPlaceholderText('Add an item...')
+    // 1. Auto-prefill must be ACTIVE first (RED until Wave 1): an exact match
+    //    prefills Dairy. (Asserting this makes the no-clobber guard non-vacuous —
+    //    it can only pass once prefill exists AND the touched-guard works.)
+    await user.type(input, 'milk')
+    expect(selectValue()).toBe('Dairy')
+
+    // 2. Manually override to a category that differs from any auto-match.
+    await user.click(screen.getByText('Snacks'))
+    expect(selectValue()).toBe('Snacks')
+
+    // 3. A later keystroke producing an exact match must NOT overwrite the manual
+    //    pick (categoryTouched). Retype Milk → would re-prefill Dairy without the guard.
+    await user.clear(input)
+    await user.type(input, 'milk')
+
+    expect(selectValue()).toBe('Snacks')
+  })
+
+  it('resets categoryTouched on submit so the next entry can auto-prefill again', async () => {
+    mockSuggestionData = [{ name: 'Milk', category: 'Dairy', quantity: '2' }]
+    mockAddItem.mockResolvedValue(undefined)
+    const user = userEvent.setup()
+    render(<AddItemBar listId="list-1" addedBy="Test User" />)
+
+    await waitFor(() => {
+      expect(true).toBe(true)
+    })
+
+    const input = screen.getByPlaceholderText('Add an item...')
+    // Manual pick → categoryTouched true.
+    await user.click(screen.getByText('More details'))
+    await user.click(screen.getByText('Other'))
+    expect(selectValue()).toBe('Other')
+
+    // Submit clears fields AND resets categoryTouched.
+    await user.click(screen.getByRole('button', { name: 'Add item' }))
+    await waitFor(() => {
+      expect(mockAddItem).toHaveBeenCalled()
+    })
+
+    // Next entry: an exact match should auto-prefill again (flag was reset).
+    await user.type(input, 'milk')
+    await waitFor(() => {
+      expect(selectValue()).toBe('Dairy')
     })
   })
 })

@@ -99,6 +99,28 @@ vi.mock('@/lib/supabase', () => ({
   },
 }))
 
+// usePreferencesStore (QOL-02) does not exist yet. Mock it so ListPage.tsx's
+// Wave-1 import resolves and these RED tests can assert the checked-to-bottom
+// toggle reads/writes the pref and feeds checkedToBottom into the grouping.
+// Per-test controllable; mirrors the useUIStore real-store usage in this file.
+let mockCheckedToBottom = false
+const mockSetCheckedToBottom = vi.fn((v: boolean) => { mockCheckedToBottom = v })
+const mockToggleCheckedToBottom = vi.fn(() => { mockCheckedToBottom = !mockCheckedToBottom })
+vi.mock('@/stores/preferencesStore', () => ({
+  usePreferencesStore: (
+    selector: (state: {
+      checkedToBottom: boolean
+      setCheckedToBottom: typeof mockSetCheckedToBottom
+      toggleCheckedToBottom: typeof mockToggleCheckedToBottom
+    }) => unknown,
+  ) =>
+    selector({
+      checkedToBottom: mockCheckedToBottom,
+      setCheckedToBottom: mockSetCheckedToBottom,
+      toggleCheckedToBottom: mockToggleCheckedToBottom,
+    }),
+}))
+
 /** A minimal User object sufficient for resolveDisplayName and owner checks. */
 function makeUser(overrides: Partial<User> = {}): User {
   return {
@@ -527,5 +549,207 @@ describe('ListPage — D-10/NAV-03', () => {
     })
 
     expect(mockRestoreBanner).toHaveBeenCalledWith('ABC12345')
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// RED (Wave 0, VIEW-01 / D-06): item count badge. ListPage does not render the
+// `{checked} / {total} checked` badge yet — these fail until it lands (Wave 1).
+// UI-SPEC §3: muted subtitle under the title, aria-live="polite", hidden when total===0.
+// ──────────────────────────────────────────────────────────────────────────
+describe('ListPage — item count badge (VIEW-01)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockItemsResponse = []
+    mockCheckedToBottom = false
+    useItemsStore.setState({ items: [], loading: false, error: null, syncStatus: 'connecting', channel: null })
+    useAuthStore.setState({ user: makeUser(), isLoading: false, error: null })
+    useUIStore.setState({ dismissedBanners: new Set() })
+  })
+
+  it('renders "{checked} / {total} checked" reflecting the loaded items', async () => {
+    setupListWithItems([checkedItem, uncheckedItem])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    // 1 checked of 2 total.
+    expect(await screen.findByText('1 / 2 checked')).toBeTruthy()
+  })
+
+  it('updates the badge when an item is toggled checked', async () => {
+    setupListWithItems([uncheckedItem])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    expect(await screen.findByText('0 / 1 checked')).toBeTruthy()
+
+    // Flip the only item to checked via the store; the badge must re-derive.
+    await act(async () => {
+      useItemsStore.setState((s) => ({
+        items: s.items.map((i) => ({ ...i, checked: true })),
+      }))
+    })
+
+    expect(await screen.findByText('1 / 1 checked')).toBeTruthy()
+  })
+
+  it('hides the badge entirely when there are no items (total === 0)', async () => {
+    setupListWithItems([])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    // Empty state owns the messaging; the badge must be absent.
+    expect(screen.queryByText(/\d+ \/ \d+ checked/)).toBeNull()
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// RED (Wave 0, SHOP-06 / D-05): uncheck-all button + confirm dialog. ListPage
+// has no uncheck-all affordance yet — these fail until it lands (Wave 1).
+// UI-SPEC §2: button `Uncheck all ({checkedCount})` gated on checkedCount>0; confirm
+// Dialog (mirror Clear) with `Uncheck all` (destructive) calling uncheckAll, and
+// `Keep checked` (cancel) closing without calling it.
+// ──────────────────────────────────────────────────────────────────────────
+describe('ListPage — uncheck-all flow (SHOP-06)', () => {
+  const mockUncheckAll = vi.fn().mockResolvedValue(undefined)
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockItemsResponse = []
+    mockCheckedToBottom = false
+    useItemsStore.setState({
+      items: [], loading: false, error: null, syncStatus: 'connecting', channel: null,
+      // Wave-1 adds uncheckAll to the store; seed it here so the confirm wiring is testable.
+      uncheckAll: mockUncheckAll,
+    } as Partial<Parameters<typeof useItemsStore.setState>[0]>)
+    useAuthStore.setState({ user: makeUser(), isLoading: false, error: null })
+    useUIStore.setState({ dismissedBanners: new Set() })
+  })
+
+  it('does not render the Uncheck all button when no items are checked', async () => {
+    setupListWithItems([uncheckedItem])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    expect(screen.queryByText(/Uncheck all/)).toBeNull()
+  })
+
+  it('renders "Uncheck all (1)" when a checked item exists', async () => {
+    setupListWithItems([checkedItem])
+    renderAtRoute('ABC12345')
+
+    expect(await screen.findByText(/Uncheck all \(1\)/)).toBeTruthy()
+  })
+
+  it('opens a confirm dialog whose confirm button calls uncheckAll', async () => {
+    setupListWithItems([checkedItem])
+    renderAtRoute('ABC12345')
+
+    const trigger = await screen.findByText(/Uncheck all \(1\)/)
+    await act(async () => {
+      await userEvent.click(trigger)
+    })
+
+    // Confirm dialog mirrors the Clear dialog: Keep checked + Uncheck all buttons.
+    const confirm = await screen.findByText('Uncheck all', { selector: 'button' })
+    expect(await screen.findByText('Keep checked')).toBeTruthy()
+
+    await act(async () => {
+      await userEvent.click(confirm)
+    })
+
+    expect(mockUncheckAll).toHaveBeenCalledWith('list-id-1')
+  })
+
+  it('Keep checked closes the dialog without calling uncheckAll', async () => {
+    setupListWithItems([checkedItem])
+    renderAtRoute('ABC12345')
+
+    const trigger = await screen.findByText(/Uncheck all \(1\)/)
+    await act(async () => {
+      await userEvent.click(trigger)
+    })
+
+    const keep = await screen.findByText('Keep checked')
+    await act(async () => {
+      await userEvent.click(keep)
+    })
+
+    await waitFor(() => {
+      expect(screen.queryByText('Keep checked')).toBeNull()
+    })
+    expect(mockUncheckAll).not.toHaveBeenCalled()
+  })
+})
+
+// ──────────────────────────────────────────────────────────────────────────
+// RED (Wave 0, QOL-02 / D-11): checked-to-bottom toggle. ListPage has no toggle
+// yet — these fail until the icon Button lands (Wave 1). UI-SPEC §5: icon Button
+// with aria-pressed reflecting the pref + flipping aria-label, wired to
+// usePreferencesStore.toggleCheckedToBottom and feeding checkedToBottom into grouping.
+// ──────────────────────────────────────────────────────────────────────────
+describe('ListPage — checked-to-bottom toggle (QOL-02)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockItemsResponse = []
+    mockCheckedToBottom = false
+    useItemsStore.setState({ items: [], loading: false, error: null, syncStatus: 'connecting', channel: null })
+    useAuthStore.setState({ user: makeUser(), isLoading: false, error: null })
+    useUIStore.setState({ dismissedBanners: new Set() })
+  })
+
+  it('renders the toggle with aria-pressed=false and the OFF aria-label when pref is false', async () => {
+    mockCheckedToBottom = false
+    setupListWithItems([uncheckedItem])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    const toggle = screen.getByLabelText('Sort checked items to bottom')
+    expect(toggle.getAttribute('aria-pressed')).toBe('false')
+  })
+
+  it('reflects the ON aria-label and aria-pressed=true when pref is true', async () => {
+    mockCheckedToBottom = true
+    setupListWithItems([uncheckedItem])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    const toggle = screen.getByLabelText('Stop sorting checked items to bottom')
+    expect(toggle.getAttribute('aria-pressed')).toBe('true')
+  })
+
+  it('clicking the toggle calls toggleCheckedToBottom', async () => {
+    mockCheckedToBottom = false
+    setupListWithItems([uncheckedItem])
+    renderAtRoute('ABC12345')
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { name: 'Groceries' })).toBeTruthy()
+    })
+
+    const toggle = screen.getByLabelText('Sort checked items to bottom')
+    await act(async () => {
+      await userEvent.click(toggle)
+    })
+
+    expect(mockToggleCheckedToBottom).toHaveBeenCalledTimes(1)
   })
 })
