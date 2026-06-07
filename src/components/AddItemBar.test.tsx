@@ -545,6 +545,10 @@ describe('AddItemBar — auto-categorize prefill (QOL-01)', () => {
     })
 
     const input = screen.getByPlaceholderText('Add an item...')
+    // A name is required for a valid submit (items must have a name — the
+    // empty-name guard in handleSubmit is a hard correctness invariant).
+    // 'Eggs' is not in history, so it does NOT auto-prefill/expand.
+    await user.type(input, 'Eggs')
     // Manual pick → categoryTouched true.
     await user.click(screen.getByText('More details'))
     await user.click(screen.getByText('Other'))

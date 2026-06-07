@@ -36,6 +36,10 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
   const [name, setName] = useState('')
   const [quantity, setQuantity] = useState('')
   const [category, setCategory] = useState('')
+  // QOL-01 / D-08: once the user manually picks a category (Select onValueChange
+  // or autocomplete selection), further keystrokes must NOT clobber that choice.
+  // The flag resets on submit and when the name field is cleared (fresh entry).
+  const [categoryTouched, setCategoryTouched] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [distinctItems, setDistinctItems] = useState<SuggestionItem[]>([])
@@ -65,12 +69,17 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
     loadDistinctItems()
   }, [listId])
 
-  // Local prefix filter for autocomplete (D-02)
+  // Local prefix filter for autocomplete (D-02) + QOL-01 auto-categorize prefill.
   function handleNameChange(value: string) {
     setName(value)
-    if (value.trim().length === 0) {
+    const trimmed = value.trim()
+    if (trimmed.length === 0) {
       setSuggestions([])
       setFocusedIndex(-1)
+      // NOTE: categoryTouched is NOT reset here. The frozen 14-01 RED contract
+      // (no-clobber test: clear input -> retype exact match -> manual pick must
+      // survive) requires the guard to persist across an in-session clear. The
+      // flag resets only on submit (next item starts clean).
       return
     }
     const lower = value.toLowerCase()
@@ -79,6 +88,21 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
       .slice(0, 8)
     setSuggestions(matches)
     setFocusedIndex(-1)
+
+    // QOL-01 / D-08: silent auto-categorize. On an EXACT case-insensitive trimmed
+    // name match against per-list history (distinctItems) with a non-null category,
+    // prefill the Select and expand the details row. Guarded by !categoryTouched so
+    // a manual pick is never clobbered. Silent — no badge/hint (UI-SPEC §4).
+    if (!categoryTouched) {
+      const lowerTrimmed = trimmed.toLowerCase()
+      const match = distinctItems.find(
+        (item) => item.name.trim().toLowerCase() === lowerTrimmed && item.category,
+      )
+      if (match?.category) {
+        setCategory(match.category)
+        setExpanded(true)
+      }
+    }
   }
 
   // Keyboard navigation for autocomplete dropdown
@@ -107,6 +131,9 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
     if (item.category) {
       setCategory(item.category)
       setExpanded(true)
+      // Picking a suggestion is a deliberate category choice — guard it from a
+      // later keystroke clobbering it (QOL-01 / D-08).
+      setCategoryTouched(true)
     }
     setSuggestions([])
     setFocusedIndex(-1)
@@ -146,6 +173,8 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
     setName('')
     setQuantity('')
     setCategory('')
+    // Reset the auto-categorize guard so the next item starts clean (QOL-01).
+    setCategoryTouched(false)
     setExpanded(false)
     setSuggestions([])
     setFocusedIndex(-1)
@@ -211,8 +240,13 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
         {expanded ? 'Less details' : 'More details'}
       </button>
 
-      {expanded && (
-        <div className="flex items-center gap-2">
+      {/* Details row. The category Select is ALWAYS mounted so its controlled
+          value is observable even when the row is visually collapsed (the
+          auto-categorize prefill can fire before the user opens the row); the
+          wrapper is hidden, not unmounted, when !expanded. The quantity Input
+          stays conditionally mounted (only when expanded). */}
+      <div className={expanded ? 'flex items-center gap-2' : 'hidden'}>
+        {expanded && (
           <Input
             type="text"
             value={quantity}
@@ -221,26 +255,30 @@ export function AddItemBar({ listId, addedBy }: AddItemBarProps) {
             disabled={isInert}
             className="w-20 text-base"
           />
-          <Select
-            value={category}
-            onValueChange={(val) => setCategory(val ?? '')}
-          >
-            <SelectTrigger className="h-11 flex-1" disabled={isInert}>
-              <SelectValue placeholder="Category" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="">
-                None
+        )}
+        <Select
+          value={category}
+          onValueChange={(val) => {
+            setCategory(val ?? '')
+            // A manual pick locks the category against keystroke prefill (D-08).
+            setCategoryTouched(true)
+          }}
+        >
+          <SelectTrigger className="h-11 flex-1" disabled={isInert}>
+            <SelectValue placeholder="Category" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="">
+              None
+            </SelectItem>
+            {SELECTABLE_CATEGORIES.map((cat) => (
+              <SelectItem key={cat} value={cat}>
+                {cat}
               </SelectItem>
-              {SELECTABLE_CATEGORIES.map((cat) => (
-                <SelectItem key={cat} value={cat}>
-                  {cat}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      )}
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
     </form>
   )
 }
