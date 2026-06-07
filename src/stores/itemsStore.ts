@@ -407,17 +407,37 @@ export const useItemsStore = create<ItemsState>()((set, get) => ({
       return { items: [...state.items, ...toAdd], lastCleared: [], error: null }
     })
 
-    // A1 verdict (14-01): items.id ACCEPTS a client-supplied UUID on INSERT, so re-insert
-    // the buffered rows with their original ids via .insert(buffered). RLS gates only by
-    // list_id membership; the buffer only holds rows the user just cleared on their list.
-    const { error } = await supabase.from('items').insert(buffered)
+    // CR-01: re-insert only the column whitelist that addItem uses, mirroring the insert
+    // contract — do NOT re-send DB-managed columns. A1 verdict (14-01): items.id ACCEPTS a
+    // client-supplied UUID on INSERT, so the original `id` IS preserved (the Realtime INSERT
+    // echo is then idempotent-by-id). But `created_at` and `user_id` are NOT re-sent: let the
+    // DB defaults apply (user_id DEFAULT auth.uid() — items_auth.sql — sets the current user,
+    // exactly as addItem relies on; created_at gets a fresh server timestamp). RLS gates only
+    // by list_id membership (items_membership.sql); the buffer only holds rows the user just
+    // cleared on their own list, so the whitelist passes WITH CHECK.
+    const rows = buffered.map((i) => ({
+      id: i.id,
+      list_id: i.list_id,
+      name: i.name,
+      quantity: i.quantity,
+      category: i.category,
+      added_by: i.added_by,
+      checked: i.checked,
+      note: i.note,
+      position: i.position,
+    }))
+    const { error } = await supabase.from('items').insert(rows)
 
     if (error) {
       // Rollback: remove the optimistically re-added buffered ids again.
+      // WR-05: restore lastCleared so the buffer is not lost — the snackbar reappears and
+      // the user can retry the undo. The cleared rows were already DELETEd server-side by
+      // clearChecked, so without this restore a failed undo would lose them permanently.
       // SYNC-03: If offline, also set syncStatus to 'reconnecting' (belt-and-suspenders).
       const bufferedIds = new Set(buffered.map((i) => i.id))
       set((state) => ({
         items: state.items.filter((i) => !bufferedIds.has(i.id)),
+        lastCleared: buffered,
         error: 'Failed to restore items',
         syncStatus: !navigator.onLine ? 'reconnecting' : get().syncStatus,
       }))
