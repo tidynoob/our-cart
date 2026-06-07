@@ -1,0 +1,35 @@
+# Source pattern: GitHub scheduled workflows + liskin/gh-workflow-keepalive README + Supabase PostgREST.
+name: keepalive
+
+on:
+  schedule:
+    - cron: '17 4 * * *'   # 04:17 UTC daily — off-peak minute, avoids :00 congestion
+  workflow_dispatch: {}     # manual run for verification
+
+# Least privilege: only the keepalive step needs actions:write.
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write        # required by gh-workflow-keepalive to re-enable the schedule
+    steps:
+      - name: Ping Supabase DB (touch a real table to reset the 7-day pause timer)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          set -euo pipefail
+          status=$(curl -fsS -o /dev/null -w '%{http_code}' \
+            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+            -H "Authorization: Bearer ${SUPABASE_PUBLISHABLE_KEY}" \
+            "${SUPABASE_URL}/rest/v1/profiles?select=id&limit=1")
+          echo "Supabase ping HTTP status: ${status}"
+          # -f already fails on >=400; this is a defensive belt-and-suspenders for 2xx.
+          case "$status" in 2*) echo "OK";; *) echo "Unexpected status"; exit 1;; esac
+
+      - name: Keep this scheduled workflow from being auto-disabled (60-day inactivity)
+        if: github.event_name == 'schedule'
+        uses: liskin/gh-workflow-keepalive@v1
