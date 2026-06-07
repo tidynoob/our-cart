@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { useItemsStore } from './itemsStore'
+import type { Item } from '@/types/item'
 
 // QOL-03 (D-12): toggleChecked fires triggerHaptic on the check-ON transition only.
 // Mock the module so we can assert call/no-call without touching navigator.vibrate.
